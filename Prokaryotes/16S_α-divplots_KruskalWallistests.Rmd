@@ -1,0 +1,366 @@
+---
+title: "α-Diversity and Kruskal Wallis tests"
+author: "Sven"
+date: "2/22/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+##Notes:
+It is best to go through each dataset (consensus fjord/horizontal Long Sound community/ Vertical Long Sound community) one by one. So following the order of this file from start to finish, in order.
+
+#Set up
+```{r Load packages}
+library(vegan)
+library(phyloseq)
+library(ggplot2)
+library(dplyr)
+library(microbiome)
+```
+##Import files:
+```{r Set path}
+
+uzdir <- "/Users/sven/Desktop/Project_R_analysis/"
+otutable_biom_file <- paste("/Users/sven/Desktop/Project_R_analysis/", "Merged_otu_table_json.biom", sep = "")
+map_file <- paste("/Users/sven/Desktop/Project_R_analysis/Sorted_out/", "Modified_mapping_file_mod_with_names_and_variables.txt", sep = "")
+
+
+```
+```{r Create phyloseq object}
+# Now import the .biom-formatted otu_table-tax_table file.
+
+biom_otu_tax <- import_biom(otutable_biom_file)
+
+# Add sample data to the dataset using merge
+bmsd <- import_qiime_sample_data(map_file)
+class(bmsd)
+dim(bmsd)
+sample_data(bmsd)
+sample_variables(bmsd)
+biom_otu_tax
+
+
+#Merge into phyloseq format
+Fiord_phyloseq <- merge_phyloseq(biom_otu_tax, bmsd)
+Fiord_phyloseq
+sample_sums(Fiord_phyloseq)
+
+#Save original phyloseq file
+Fiord_phyloseq_v = Fiord_phyloseq
+
+#Fix Misslabel
+Fiord_phyloseq@sam_data$Sample_Depth[Fiord_phyloseq@sam_data$Sample_Depth == 1] = 0
+#Ensure sample depth is seen as a factor for ease of use
+sample_data(Fiord_phyloseq)$Sample_Depth<-as.factor(sample_data(Fiord_phyloseq)$Sample_Depth)
+```
+##Create average result for multiple rarefaction by transforming data using (divide by 10) and check counts per sample
+```{r Create average result for multiple rarefaction by transforming data using (divide by 10), results='markup'}
+Fiord_phyloseq = transform_sample_counts(Fiord_phyloseq, function(x) x/10)
+sample_sums(Fiord_phyloseq)
+```
+#### Round and confirm count number
+```{r Round and confirm count number, results='markup'}
+Fiord_phyloseq = transform_sample_counts(Fiord_phyloseq, round)
+sample_sums(Fiord_phyloseq)
+Fiord_phyloseq = prune_samples(sample_sums(Fiord_phyloseq)>=1, Fiord_phyloseq)
+sample_sums(Fiord_phyloseq)
+```
+Check that all OTUs have representative counts  
+For here taxa = OTU  
+__Commands interpretation:__  
+_Total number of taxa in dataset:_ sum(taxa_sums(Fiord_phyloseq) > 0)   
+
+_Any taxa with no hits:_ any(taxa_sums(Fiord_phyloseq)== 0)
+```{r identify taxa with only zeros, results='markup', echo=TRUE}
+sum(taxa_sums(Fiord_phyloseq) > 0)
+any(taxa_sums(Fiord_phyloseq)== 0)
+sum(taxa_sums(Fiord_phyloseq) == 0)
+any(taxa_sums(Fiord_phyloseq) > 1)
+sum(taxa_sums(Fiord_phyloseq) > 1)
+any(taxa_sums(Fiord_phyloseq) < 1)
+sum(taxa_sums(Fiord_phyloseq) < 1)
+```
+####Prune taxa with less than 1 count and check taxa numbers again
+```{r  Save original file and create new file with only present (no zeroes) taxa, results='markup', echo=TRUE}
+
+#Create new file with only present (no zeroes) taxa
+
+Fiord_phyloseq = prune_taxa(taxa_sums(Fiord_phyloseq) > 1, Fiord_phyloseq)
+any(sample_sums(Fiord_phyloseq) == 0)
+any(sample_sums(Fiord_phyloseq) > 0)
+sum(taxa_sums(Fiord_phyloseq) > 0)
+any(sample_sums(Fiord_phyloseq) < 1)
+sum(taxa_sums(Fiord_phyloseq) < 1)
+```
+##Compare sequences per sample or OTU
+```{r Compare sequences per sample or OTU}
+readsumsdf = data.frame(nreads = sort(taxa_sums(Fiord_phyloseq),TRUE), sorted = 1:ntaxa(Fiord_phyloseq), type = "OTU")
+readsumsdf = rbind(readsumsdf,data.frame(nreads = sort(sample_sums(Fiord_phyloseq),TRUE),sorted = 1:nsamples(Fiord_phyloseq), type = "Samples"))
+
+title = "Total number of reads"
+
+p = ggplot(readsumsdf, aes(x = sorted, y = nreads)) +
+  geom_bar(stat = "identity")
+
+p + ggtitle(title) +
+  scale_y_log10() +
+  facet_wrap(~type, 1, scales = "free")
+```
+```{r What sample variables exist in the phyloseq data}
+sample_variables(Fiord_phyloseq)
+```
+```{r Attached OTU ID}
+tax_table(Fiord_phyloseq) <- cbind(tax_table(Fiord_phyloseq), OTU=taxa_names(Fiord_phyloseq))
+```
+```{r Rename Ranks}
+colnames(tax_table(Fiord_phyloseq)) = c("Domain", "Phylum", "Class", "Order", "Family", "Genus", "Species", "OTU")
+tax_table(Fiord_phyloseq) =gsub("D_0__", "", tax_table(Fiord_phyloseq))
+tax_table(Fiord_phyloseq) =gsub("D_1__", "", tax_table(Fiord_phyloseq))
+tax_table(Fiord_phyloseq) =gsub("D_2__", "", tax_table(Fiord_phyloseq))
+tax_table(Fiord_phyloseq) =gsub("D_3__", "", tax_table(Fiord_phyloseq))
+tax_table(Fiord_phyloseq) =gsub("D_4__", "", tax_table(Fiord_phyloseq))
+tax_table(Fiord_phyloseq) =gsub("D_5__", "", tax_table(Fiord_phyloseq))
+tax_table(Fiord_phyloseq) =gsub("D_6__", "", tax_table(Fiord_phyloseq))
+
+```
+#Subset phyloseq objects
+```{r Subset}
+#Subset to in/out
+Fiord_phyloseq_in_out = subset_samples(Fiord_phyloseq, !Sample_type == "Transverse")
+
+#Subset horizontal community
+Fiord_phyloseq_Horonly = subset_samples(Fiord_phyloseq, Sample_type == "Transverse" & !Sample_Depth == "40" & !Sample_Depth == "100" & !Sample_Depth == "200" & !Sample_Depth == "360")
+
+#Subset vertical community
+Fiord_phyloseq_Vert = subset_samples(Fiord_phyloseq, !Sample_type == "in" & !Sample_type == "out")
+Fiord_phyloseq_Vert = subset_samples(Fiord_phyloseq_Vert, Sample_Site == "L5")
+```
+
+
+##Phylum colour list for consistency
+```{r Phylum colour list}
+Phylum_colour_list = c(Acidobacteria = "red",
+                       Actinobacteria = "green",
+                       "Alphaproteobacteria" = "burlywood1",
+                       "Alveolata" = "blueviolet",
+                       Archaeplastida = "#F8766D",
+                       Bacteroidetes = "steelblue",  
+                       Chlamydiae = "navy", 
+                       Chloroflexi = "grey",
+                       Cyanobacteria = "purple", 
+                       "Deltaproteobacteria" = "orange",
+                       "Discoba" = "darkslategray1",
+                       Euryarchaeota = "aquamarine", 
+                       "Epsilonproteobacteria" = "darkslateblue",
+                       "Excavata" = "#7CAE00",
+                       "Gammaproteobacteria" = "dimgray",
+                       "Holozoa" = "forestgreen",
+                       "Marine Group I" = "gainsboro",
+                       Marinimicrobia = "darkseagreen1",
+                       Opisthokonta = "magenta", 
+                       Parcubacteria = "chocolate2", 
+                       Planctomycetes = "wheat", 
+                       Proteobacteria = "olivedrab",
+                       "Rhizaria" = "goldenrod",
+                       Thaumarchaeota = "firebrick", 
+                       SAR = "darkred", 
+                       "Stramenopiles" = "darkorchid1",
+                       "Thermoplasmata" = "tan",
+                       Verrucomicrobia = "gold4", 
+                       "Rare Taxa (<1%)" = "black")
+```
+#Consensus fjord α-diversity plot
+```{r Consensus plot set up and plotting}
+#Carry out richness calculations
+alpha_summary_in_out <- estimate_richness(Fiord_phyloseq_in_out, measures = c("Observed", "Shannon"))
+Evenness_in_out <- evenness(Fiord_phyloseq_in_out, 'pielou')
+alpha_summary_in_out$Pielou <- Evenness_in_out$pielou
+#combine with metadata
+alpha_meta_in_out <- data.frame(alpha_summary_in_out, sample_data(Fiord_phyloseq_in_out))
+alpha_meta_in_out
+
+#Count how many depth levels there are - should be two
+levels(alpha_meta_in_out$Sample_Depth)
+
+#Relabell depth levels
+levels(alpha_meta_in_out$Sample_Depth) = c("0 m", "10 m")
+
+#Make a manual fjord name list
+Fjordlist = c("Breaksea Sound", "Chalky Inlet", "Doubtful Sound", "Dusky Sound", "Wet Jacket Arm")
+
+#Carry out plotting
+Observed_Richness_in_out_D <- ggplot(alpha_meta_in_out, aes(x=Sample_Site, y=Observed)) + 
+  geom_point(size=1, aes(colour=Sample_type)) +
+  geom_smooth(method = "lm") +         
+  xlab("Fjord") +
+ # ggtitle("In and out samples separated by depth (metre)") +
+  labs(y = expression ("Observed Richness")) +
+  expand_limits(y=0) +                        
+  theme_bw() +
+  facet_wrap(~Sample_Depth) +
+#  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
+  #theme(axis.title.x = element_text(size=30),
+#        axis.text.x = element_text(angle=0, colour = "black", vjust=1, hjust = 0.5, size=30), 
+ #       axis.text.y = element_text(colour = "black", size=30),
+  #      axis.title.y = element_text(face="bold",size=30),
+   #     plot.title = element_text(size = 30,hjust=0.5),
+    #    legend.title =element_text(size = 30),
+     #   legend.text = element_text(size = 28),
+      #  legend.position="right",
+       # legend.key.size = unit(1, "cm"),
+      #  strip.text.x = element_text(size=30, face="bold"),
+       # strip.text.y = element_text(size=30, face="bold"),
+        #panel.background = element_blank(),
+        #panel.border = element_rect(fill = NA, colour = "black"),
+       # strip.background = element_rect(colour="black"))+
+  labs(colour = "Sample region", title = element_blank())+
+  scale_colour_manual(labels = c("Inner", "Outer"), values = c("red", "blue"))+
+  scale_x_discrete(labels = Fjordlist)+
+  theme(axis.text.x=element_text(color = "black", angle=45, vjust=.8, hjust=0.8))
+
+```
+```{r Export consensus fjords for later ggarrange}
+saveRDS(Observed_Richness_in_out_D,"~/Desktop/Multifjord_alphaDiv_16S.rds")
+```
+#Consensus fjord Kruskal-Wallis (KW) tests
+```{r Carry out consensus KW tests}
+kruskal.test(Observed ~ Sample_type, data = alpha_meta_in_out)
+kruskal.test(Observed ~ Sample_Site, data = alpha_meta_in_out)
+kruskal.test(Observed ~ Sample_Depth, data = alpha_meta_in_out)
+
+kruskal.test(Shannon ~ Sample_type, data = alpha_meta_in_out)
+kruskal.test(Shannon ~ Sample_Site, data = alpha_meta_in_out)
+kruskal.test(Shannon ~ Sample_Depth, data = alpha_meta_in_out)
+```
+#Horizontal community α-diversity plot
+```{r Horizontal community plot set up and plotting}
+#Calculate richness
+alpha_summary_Hor <- estimate_richness(Fiord_phyloseq_Hor, measures = c("Observed", "Shannon"))
+Evenness_Hor <- evenness(Fiord_phyloseq_Hor, 'pielou')
+alpha_summary_Hor$Pielou <- Evenness_Hor$pielou
+#combine with metadata
+alpha_meta_Hor <- data.frame(alpha_summary_Hor, sample_data(Fiord_phyloseq_Hor))
+alpha_meta_Hor
+
+#Add distance from L1 onto df
+observedrichness_distancefrom_L1 = alpha_meta_Hor[,-c(51:86)]
+
+observedrichness_distancefrom_L1$Distancefrom_L1 = as.numeric("0")
+
+observedrichness_distancefrom_L1[1,51] = 14.3
+observedrichness_distancefrom_L1[2,51] = 8.47
+observedrichness_distancefrom_L1[3,51] = 8.47
+observedrichness_distancefrom_L1[4,51] = 5.59
+observedrichness_distancefrom_L1[5,51] = 10.67
+observedrichness_distancefrom_L1[6,51] = 14.3
+observedrichness_distancefrom_L1[7,51] = 14.3
+observedrichness_distancefrom_L1[8,51] = 14.3
+observedrichness_distancefrom_L1[9,51] = 0
+observedrichness_distancefrom_L1[10,51] = 8.47
+observedrichness_distancefrom_L1[11,51] = 2.47
+observedrichness_distancefrom_L1[12,51] = 8.47
+observedrichness_distancefrom_L1[13,51] = 3.16
+observedrichness_distancefrom_L1[14,51] = 4.73
+observedrichness_distancefrom_L1[15,51] = 10.67
+observedrichness_distancefrom_L1[16,51] = 0
+observedrichness_distancefrom_L1[17,51] = 5.59
+observedrichness_distancefrom_L1[18,51] = 0
+observedrichness_distancefrom_L1[19,51] = 4.73
+observedrichness_distancefrom_L1[20,51] = 5.59
+observedrichness_distancefrom_L1[21,51] = 5.59
+observedrichness_distancefrom_L1[22,51] = 3.17
+observedrichness_distancefrom_L1[23,51] = 0
+
+#Change facet wrap labels
+observedrichness_distancefrom_L1$Sample_Depth = as.factor(observedrichness_distancefrom_L1$Sample_Depth)
+
+levels(observedrichness_distancefrom_L1$Sample_Depth)
+levels(observedrichness_distancefrom_L1$Sample_Depth) = c("0 m", "10 m")
+
+#Make plot
+Observed_Richness_Hor_D_distance <- ggplot(observedrichness_distancefrom_L1, aes(x=Distancefrom_L1, y=Observed)) + 
+  geom_point(size=3.5) +
+  geom_smooth(method = "lm") +         
+  xlab("Sample site") +
+  #ggtitle("Sample observed richness separated by depth") +
+  labs(y = expression ("Observed Richness")) +
+  xlab("Distance from outermost sample (km)")+
+  expand_limits(y=0) +                        
+  theme_bw() +
+  facet_wrap(~Sample_Depth) +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
+  theme(axis.title.x = element_text(),
+        axis.text.x = element_text(angle=0, colour = "black", hjust = 0.5), 
+        axis.text.y = element_text(colour = "black"),
+        axis.title.y = element_text(face="bold"),
+        plot.title = element_text(hjust=0.5),
+        panel.background = element_blank(),
+        panel.border = element_rect(fill = NA, colour = "black"),
+        strip.background = element_rect(colour="black"))
+
+```
+```{r Export Horizontal community for later ggarrange}
+saveRDS(Observed_Richness_Hor_D_distance,"~/Desktop/Transect_alphadiv_16S_Observed.rds")
+```
+#Horizontal community Kruskal-Wallis (KW) tests
+```{r Carry out horizontal community KW tests}
+
+#Add distances to the phyloseq object for accuracy (rather than using stations)
+alpha_meta_Hor$Distance[alpha_meta_Hor$Sample_Site == "L1"] = 0
+alpha_meta_Hor$Distance[alpha_meta_Hor$Sample_Site == "L2"] = 5.59
+alpha_meta_Hor$Distance[alpha_meta_Hor$Sample_Site == "L3"] = 14.3
+alpha_meta_Hor$Distance[alpha_meta_Hor$Sample_Site == "L4"] = 10.67
+alpha_meta_Hor$Distance[alpha_meta_Hor$Sample_Site == "L5"] = 8.47
+alpha_meta_Hor$Distance[alpha_meta_Hor$Sample_Site == "L6"] = 4.73
+alpha_meta_Hor$Distance[alpha_meta_Hor$Sample_Site == "L7"] = 3.16
+alpha_meta_Hor$Distance[alpha_meta_Hor$Sample_Site == "L8"] = 2.47
+
+kruskal.test(Observed ~ Distance, data = alpha_meta_Hor) #This means that the alpha-diversity seems to change as we go along the Fjord.
+#0.0349
+
+kruskal.test(Observed ~ Sample_Depth, data = alpha_meta_Hor) #No significance.
+#0.4777
+
+```
+#Vertical community α-diversity plot
+```{r Vertical community plot set up and plotting}
+
+#Calculate richness
+alpha_summary_Vert <- estimate_richness(Fiord_phyloseq_Vert, measures = c("Observed", "Shannon"))
+Evenness_Vert <- evenness(Fiord_phyloseq_Vert, 'pielou')
+alpha_summary_Vert$Pielou <- Evenness_Vert$pielou
+#combine with metadata
+alpha_meta_Vert <- data.frame(alpha_summary_Vert, sample_data(Fiord_phyloseq_Vert))
+alpha_meta_Vert
+
+#Make summary
+Observed_summary = summarySE(alpha_meta_Vert, "Observed", groupvars = "Sample_Depth")
+
+#Make plot
+Observed_Richness_Vert_D <- ggplot(Observed_summary, 
+                                   aes(x=as.factor(as.numeric(as.character(Sample_Depth))), 
+                                       y=Observed)) + 
+  geom_line(group = "Sample_Depth")+
+  labs(y = expression ("Observed Richness"), x = expression("Sample Depth (m)")) +
+  expand_limits(y=0) +                        
+  theme_bw() +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank())+
+  #coord_flip()+
+ # scale_x_reverse()+
+  geom_errorbar(aes(ymin = Observed-se, ymax = Observed + se))
+
+```
+```{r Export Vertical community for later ggarrange}
+saveRDS(Observed_Richness_Vert_D,"~/Desktop/Profile_alphadiv_16S_Observed.rds")
+```
+#Vertical community Kruskal-Wallis (KW) tests
+```{r Carry out vertical community KW tests}
+kruskal.test(Observed ~ Sample_Depth, data = alpha_meta_Vert)
+
+
+```
+
+

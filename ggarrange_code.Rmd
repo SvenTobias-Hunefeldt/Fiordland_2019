@@ -1,0 +1,483 @@
+---
+title: "Ggarrange_mrkdwn"
+author: "Sven Tobias-Hunefeldt"
+date: "1/17/2019"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+#Load packages
+```{r Load packages}
+library(ggplot2)
+library(ggpubr)
+library(gridGraphics)
+library(vegan)
+
+```
+#Load objects into environment
+```{r Multiple fjords}
+#α-diversity
+Multifjord_alphaDiv_16S.rds = readRDS("~/Desktop/Multifjord_alphaDiv_16S.rds")
+
+#β-diversity
+Multifjord_betadiv_16S.rds = readRDS("~/Desktop/Multifjord_betadiv_16S.rds")
+
+#Community
+Multifjord_community_16S.rds = readRDS("~/Desktop/Multifjord_community_16S.rds")
+```
+```{r Profile}
+
+#No filtering
+Domainprofile18S = readRDS("~/Desktop/Fjordpaper/3_Results/11_To_ggarrange/Domainprofile18S.rds")
+Phylaprofile18S = readRDS("~/Desktop/Fjordpaper/3_Results/11_To_ggarrange/Phylaprofile18S.rds")
+
+#Physicochemical parameters
+Profile_CTD_regression = readRDS("~/Desktop/Fjordpaper/3_Results/11_To_ggarrange/Profile_CTD_regression.rds")
+
+Profile_alphadiv_16S_Observed.rds = readRDS("~/Desktop/Fjordpaper/3_Results/11_To_ggarrange/Profile_alphadiv_16S_Observed.rds")
+Profile_alphadiv_16S_Pielou.rds = readRDS("~/Desktop/Fjordpaper/3_Results/11_To_ggarrange/Profile_alphadiv_16S_Pielou.rds")
+
+Profile_betadiv_16S.rds = readRDS("~/Desktop/Fjordpaper/3_Results/11_To_ggarrange/Profile_betadiv_16S.rds")
+
+Phylum_EdgeR_Profile_16S_Depth.rds = readRDS("~/Desktop/Fjordpaper/3_Results/11_To_ggarrange/Phylum_EdgeR_Profile_16S_Depth.rds")
+Phylum_EdgeR_Profile_16S_Sal.rds = readRDS("~/Desktop/Fjordpaper/3_Results/11_To_ggarrange/Phylum_EdgeR_Profile_16S_Sal.rds")
+Phylum_EdgeR_Profile_16S_Temp.rds = readRDS("~/Desktop/Fjordpaper/3_Results/11_To_ggarrange/Phylum_EdgeR_Profile_16S_Temp.rds")
+Phylum_EdgeR_Profile_16S_Ox.rds = readRDS("~/Desktop/Fjordpaper/3_Results/11_To_ggarrange/Phylum_EdgeR_Profile_16S_Ox.rds")
+
+Profile_alphadiv_18S.rds = readRDS("~/Desktop/Fjordpaper/3_Results/11_To_ggarrange/Profile_alphadiv_18S.rds")
+
+Profile_betadiv_18S.rds = readRDS("~/Desktop/Fjordpaper/3_Results/11_To_ggarrange/Profile_betadiv_18S.rds")
+
+Phylum_EdgeR_Profile_18S.rds = readRDS("~/Desktop/Fjordpaper/3_Results/11_To_ggarrange/Phylum_EdgeR_Profile_18S.rds")
+Phylum_EdgeR_Profile_Sal_18S.rds = readRDS("~/Desktop/Fjordpaper/3_Results/11_To_ggarrange/Phylum_EdgeR_Profile_Sal_18S.rds")
+
+```
+```{r Transect}
+#Physicochemical parameters
+Surface_CTD_regression = readRDS("~/Desktop/surface_CTD_regression.rds")
+D10m_CTD_regression = readRDS("~/Desktop/10m_CTD_regression.rds")
+
+Transect_alphadiv_16S_Observed.rds = readRDS("~/Desktop/Transect_alphadiv_16S_Observed.rds")
+
+Transect_betadiv_16S.rds = readRDS("~/Desktop/Transect_betadiv_16S.rds")
+
+Phylum_EdgeR_Transect_16S_Dist.rds = readRDS("~/Desktop/Fjordpaper/3_Results/Phylum_EdgeR_Transect_16S_Dist.rds")
+Phylum_EdgeR_Transect_16S_Sal.rds = readRDS("~/Desktop/Phylum_EdgeR_Transect_16S_Sal.rds")
+Phylum_EdgeR_Transect_16S_Ox.rds = readRDS("~/Desktop/Phylum_EdgeR_Transect_16S_Ox.rds")
+Phylum_EdgeR_Transect_16S_Temp.rds = readRDS("~/Desktop/Phylum_EdgeR_Transect_16S_Temp.rds")
+
+Transect_alphadiv_18S.rds = readRDS("~/Desktop/Transect_alphadiv_18S.rds")
+
+Transect_betadiv_18S.rds = readRDS("~/Desktop/Transect_betadiv_18S.rds")
+
+Phylum_EdgeR_Transect_18S.rds = readRDS("~/Desktop/Phylum_EdgeR_Transect_18S.rds")
+Phylum_EdgeR_Transect_Sal_18S.rds = readRDS("~/Desktop/Phylum_EdgeR_Transect_Sal_18S.rds")
+```
+```{r Stressplots}
+Multi_16S_stressplot = readRDS("~/Desktop/16S_Multi_stressplot.rds") #From figure 4
+Profile_16S_stressplot = readRDS("~/Desktop/16S_Profile_stressplot.rds") #From figure 2
+Transect_16S_stressplot = readRDS("~/Desktop/16S_Transect_stressplot.rds") # from figure 2
+
+Profile_18S_stressplot = readRDS("~/Desktop/18S_Profile_stressplot.rds") #From figure 2
+Transect_18S_stressplot = readRDS("~/Desktop/18S_Transect_stressplot.rds") # from figure 2
+
+```
+#Figure 1 - alpha diveristy
+```{r ggarrange figure 2 - α-diversity}
+
+Multifjord_alphaDiv_16S.rds = Multifjord_alphaDiv_16S.rds + 
+  ylab("Richness")
+
+Profile_alphadiv_16S_Observed.rds = Profile_alphadiv_16S_Observed.rds + 
+  ylab("Richness")
+
+Transect_alphadiv_16S_Observed.rds = Transect_alphadiv_16S_Observed.rds+ 
+  ylab("Richness")
+          
+Profile_alphadiv_16S_Pielou.rds = Profile_alphadiv_16S_Pielou.rds +
+  xlab("")+
+  ylab("") 
+
+Profile_alphadiv_18S.rds = Profile_alphadiv_18S.rds + 
+  xlab("")+
+  ylab("")
+
+Transect_alphadiv_18S.rds = Transect_alphadiv_18S.rds+ 
+  xlab("")+
+  ylab("")
+          
+          
+          
+pdf("Alpha_Diversity.pdf")
+ggarrange(Multifjord_alphaDiv_16S.rds,
+          Profile_alphadiv_16S_Pielou.rds, 
+          Profile_alphadiv_16S_Observed.rds, 
+          Profile_alphadiv_18S.rds,
+          Transect_alphadiv_16S_Observed.rds,
+          Transect_alphadiv_18S.rds,
+          ncol = 2,
+          nrow = 3,
+          labels = c("a",
+                   "b",
+                   "c",
+                   "d",
+                   "e",
+                   "f"),
+          font.label = list(size = 9),
+          hjust = 0,
+          vjust = 0)
+dev.off()
+
+```
+#Figure 2 - beta-diversity
+```{r ggarrange figure 3 - β-diversity}
+
+Depth_colour_list = c("0" = "red", "10" = "blue", "40" = "grey", "100" = "green", "200" = "black", "360" = "magenta")
+
+Profile_betadiv_18S.rds = Profile_betadiv_18S.rds + 
+  scale_color_manual("Sample Depth (m)", values = Depth_colour_list)
+
+pdf("Beta_Diversity.pdf", width = 9, height = 6)
+ggarrange(Multifjord_betadiv_16S.rds,
+          Profile_betadiv_16S.rds,
+          Profile_betadiv_18S.rds, #Add in post production?
+          Transect_betadiv_16S.rds, 
+          Transect_betadiv_18S.rds,
+          legend = F,
+          labels = c("a", #Will need to zombie the labels together
+                   "b",
+                   "c",
+                   "d",
+                   "e"),
+          font.label = list(size = 9),
+          hjust = -0.1,
+          vjust = 0,
+          heights = 2,
+          width = 4)
+dev.off()
+
+Profile_betadiv_18S.rds
+dev.copy(png, "Profile_betadiv_18S", units = "in", res = 500, width = 7, height = 7)
+dev.off()
+
+pdf("For legends.pdf", height = 2, width = 4)
+Multifjord_betadiv_16S.rds
+Transect_betadiv_18S.rds
+dev.off()
+dev.copy(png, "Multifjord_betadiv_16S", units = "in", res = 500, width = 5, height = 7)
+dev.off()
+```
+#Figure 3/4/5 - community
+```{r Multifjord}
+Multifjord_community_16S.rds = Multifjord_community_16S.rds + 
+  scale_colour_manual("Phylum", 
+                      values = Phylum_colour_list)
+
+#Fjord averages
+Multifjord_community_16S.rds
+dev.copy(png, "Multifjord_community_16S", units = "in", res = 500, width = 7, height = 7)
+dev.off()
+
+pdf("Multifjord_community_16S.pdf", height = 3, width = 4)
+Multifjord_community_16S.rds
+dev.off()
+```
+```{r Profile - edit}
+
+Domainprofile18S = Domainprofile18S + 
+  theme(axis.title.y = element_blank()) + 
+  scale_colour_manual("Phylum", 
+                      values = Phylum_colour_list) + 
+  xlab("")
+
+Phylaprofile18S = Phylaprofile18S + 
+  theme(axis.title.y = element_blank()) + 
+  scale_colour_manual("Phylum", 
+                      values = Phylum_colour_list) + 
+  xlab("")
+
+Phylum_EdgeR_Profile_16S_Depth.rds = Phylum_EdgeR_Profile_16S_Depth.rds + 
+  theme(axis.title.y = element_blank()) + 
+  scale_colour_manual("Phylum", 
+                      values = Phylum_colour_list) + 
+  xlab("")
+
+Phylum_EdgeR_Profile_16S_Sal.rds = Phylum_EdgeR_Profile_16S_Sal.rds+ 
+  theme(axis.title.y = element_blank()) + 
+  scale_colour_manual("Phylum", 
+                      values = Phylum_colour_list) + 
+  xlab("")
+
+Phylum_EdgeR_Profile_16S_Temp.rds = Phylum_EdgeR_Profile_16S_Temp.rds + 
+  theme(axis.title.y = element_blank()) + 
+  scale_colour_manual("Phylum", 
+                      values = Phylum_colour_list) + 
+  xlab("")
+
+Phylum_EdgeR_Profile_16S_Ox.rds = Phylum_EdgeR_Profile_16S_Ox.rds + 
+  theme(axis.title.y = element_blank()) + 
+  scale_colour_manual("Phylum", 
+                      values = Phylum_colour_list) + 
+  xlab("")
+
+Phylum_EdgeR_Profile_18S.rds = Phylum_EdgeR_Profile_Sal_18S.rds + 
+  theme(axis.title.y = element_blank()) + 
+  scale_colour_manual("Phylum", 
+                      values = Phylum_colour_list) + 
+  xlab("")
+
+Phylum_EdgeR_Profile_Sal_18S.rds = Phylum_EdgeR_Profile_Sal_18S.rds+ 
+  theme(axis.title.y = element_blank()) + 
+  scale_colour_manual("Phylum", 
+                      values = Phylum_colour_list) + 
+  xlab("")
+
+```
+```{r Profile - Group and annotate plots}
+
+Phylaprofile18S = Phylaprofile18S + scale_fill_manual(values = Phylum_colour_list)
+
+Figure5a = ggarrange(Domainprofile18S,
+          Phylaprofile18S,
+          ncol = 2,
+          nrow = 1,
+          labels = c("a",
+                     "b"),
+          font.label = list(size = 9),
+          hjust = 0,
+          vjust = 5,
+          legend = F)
+
+Figure5a =  annotate_figure(Figure5a, left = text_grob("Relative Abundance (%)", color = "black", rot = 90), bottom = text_grob("Sample Depth (m)"))
+Figure5a
+
+
+Figure5 = ggarrange(Profile_CTD_regression, #Post production
+                    Profile_CTD_regression,
+                    Phylum_EdgeR_Profile_16S_Depth.rds,
+                    Phylum_EdgeR_Profile_18S.rds,
+                    Phylum_EdgeR_Profile_16S_Sal.rds,
+                    Phylum_EdgeR_Profile_Sal_18S.rds,
+                    Phylum_EdgeR_Profile_16S_Temp.rds,
+                    Phylum_EdgeR_Profile_16S_Ox.rds,
+          ncol = 2,
+          nrow = 4,
+          labels = c("a",
+                     "b",
+                     "c",
+                     "d",
+                     "e",
+                     "f",
+                     "g",
+                     "h"),
+          font.label = list(size = 9),
+          hjust = 0,
+          vjust = 0,
+          legend = F)
+Figure5mod = annotate_figure(Figure5,
+                left = text_grob("Relative Abundance (%)", color = "black", rot = 90),
+                bottom = text_grob("Sample Depth (m)"))
+Figure5mod
+
+
+
+pdf("Profile_community_figures_rough.pdf", width = 8, height = 4)
+Figure5a
+dev.off()
+
+pdf("Profile_community_figures.pdf")
+Figure5mod
+dev.off()
+
+ggarrange(Profile_CTD_regression, #Post production
+          FALSE,
+          Phylum_EdgeR_Profile_16S_Depth.rds,
+          Phylum_EdgeR_Profile_18S.rds,
+          Phylum_EdgeR_Profile_16S_Sal.rds,
+          Phylum_EdgeR_Profile_Sal_18S.rds,
+          Phylum_EdgeR_Profile_16S_Temp.rds,
+          Phylum_EdgeR_Profile_16S_Ox.rds,
+          ncol = 2,
+          nrow = 4,
+          labels = c("a",
+                     "b",
+                     "c",
+                     "d",
+                     "e",
+                     "f",
+                     "g"),
+          legend = T)
+dev.copy(png, "Profile_legend", units = "in", width = 25, height = 35, res = 500)
+dev.off()
+
+Profile_CTD_regression
+dev.copy(png, "Profile_CTD_regression", width = 7, height = 5, units = "in", res = 500)
+dev.off()
+```
+```{r Transect - modify plots}
+Phylum_EdgeR_Transect_16S_Dist.rds = Phylum_EdgeR_Transect_16S_Dist.rds + theme(axis.title.y = element_blank()) + scale_colour_manual("Phylum", values = Phylum_colour_list)+
+  xlab("")+
+  ylab("")
+Phylum_EdgeR_Transect_16S_Sal.rds = Phylum_EdgeR_Transect_16S_Sal.rds + theme(axis.title.y = element_blank())+ scale_colour_manual("Phylum", values = Phylum_colour_list)+
+  xlab("")+
+  ylab("")
+Phylum_EdgeR_Transect_16S_Ox.rds = Phylum_EdgeR_Transect_16S_Ox.rds + theme(axis.title.y = element_blank())+ scale_colour_manual("Phylum", values = Phylum_colour_list)+
+  xlab("")+
+  ylab("")
+Phylum_EdgeR_Transect_16S_Temp.rds = Phylum_EdgeR_Transect_16S_Temp.rds + theme(axis.title.y = element_blank())+ scale_colour_manual("Phylum", values = Phylum_colour_list)+
+  xlab("")+
+  ylab("")
+Phylum_EdgeR_Transect_18S.rds = Phylum_EdgeR_Transect_18S.rds+ theme(axis.title.y = element_blank())+ scale_colour_manual("Phylum", values = Phylum_colour_list)+
+  xlab("")+
+  ylab("")
+Phylum_EdgeR_Transect_Sal_18S.rds = Phylum_EdgeR_Transect_Sal_18S.rds+ theme(axis.title.y = element_blank())+ scale_colour_manual("Phylum", values = Phylum_colour_list)+
+  xlab("")+
+  ylab("")
+
+```
+```{r Transect - Group and annotate plots}
+
+Figure4 = ggarrange(Surface_CTD_regression,
+          D10m_CTD_regression,
+          Phylum_EdgeR_Transect_16S_Dist.rds,
+          Phylum_EdgeR_Transect_18S.rds,
+          Phylum_EdgeR_Transect_16S_Sal.rds,
+          Phylum_EdgeR_Transect_Sal_18S.rds,
+          Phylum_EdgeR_Transect_16S_Ox.rds,
+         # Emptyplot,
+          Phylum_EdgeR_Transect_16S_Temp.rds,
+          ncol = 2,
+          nrow = 4,
+          labels = c("a",
+                     "b",
+                     "c",
+                     "d",
+                     "e",
+                     "f",
+                     "g",
+                     "h"),
+         font.label = list(size = 9),
+         hjust = 0,
+         vjust = 1.1,
+         legend = F,
+         align = "hv",
+         common.legend = F)
+
+Figure4mod = annotate_figure(Figure4,
+                left = text_grob("Relative Abundance (%)", color = "black", rot = 90),
+                bottom = text_grob("Km from outermost sample"))
+
+Figure4mod
+
+pdf("Transect_community_figures.pdf")
+
+Figure4mod
+
+dev.off()
+
+dev.copy(png, "Forlegend_transect", units = "in", height = 25, width = 35, res = 500)
+dev.off()
+
+Surface_CTD_regression
+dev.copy(png, "Transect_toadd_surface", width = 7, height = 5, units = "in", res = 500)
+dev.off()
+
+D10m_CTD_regression
+dev.copy(png, "Transect_toadd_10m", width = 7, height = 5, units = "in", res = 500)
+dev.off()
+
+pdf("Transect_legend.pdf", height =9, width = 9)
+ggarrange(Phylum_EdgeR_Transect_16S_Dist.rds,
+          Phylum_EdgeR_Transect_18S.rds,
+          Phylum_EdgeR_Transect_16S_Sal.rds,
+          Phylum_EdgeR_Transect_Sal_18S.rds,
+          Phylum_EdgeR_Transect_16S_Ox.rds,
+          Phylum_EdgeR_Transect_16S_Temp.rds,
+          ncol = 2,
+          nrow = 4,
+          legend = T,
+          align = "hv")
+
+dev.off()
+```
+#Supplementary stressplots
+```{r Stressplots}
+
+stressplot(Multi_16S_stressplot) 
+Multi_16S_plot = recordPlot()
+stressplot(Profile_16S_stressplot)
+Profile_16S_plot = recordPlot()
+stressplot(Profile_18S_stressplot)
+Profile_18S_plot = recordPlot()
+stressplot(Transect_16S_stressplot) 
+Transect_16S_plot = recordPlot()
+stressplot(Transect_18S_stressplot)
+Transect_18S_plot = recordPlot()
+ 
+
+
+Stress_figure = ggarrange(Multi_16S_plot,
+          Profile_16S_plot,
+          Profile_18S_plot,
+          Transect_16S_plot, 
+          Transect_18S_plot,
+          labels = c("a",
+                   "b",
+                   "c",
+                   "d",
+                   "e"),
+          ncol = 3,
+          nrow = 2,
+          font.label = list(size = 9),
+          vjust = 0,
+          hjust = -0.1)
+
+Stressfigure = annotate_figure(Stress_figure,
+                left = text_grob("Ordination Distance", color = "black", rot = 90),
+                bottom = text_grob("Observed Dissimilarity"))
+
+pdf("Stressplots.pdf", width = 9, height = 6)
+Stressfigure
+dev.off()
+
+
+```
+#Phylum colour list
+```{r Phylum colour list}
+
+Phylum_colour_list = c(Acidobacteria = "red",
+                       Actinobacteria = "green",
+                       "Alphaproteobacteria" = "burlywood1",
+                       "Alveolata" = "blueviolet",
+                       Archaeplastida = "#F8766D",
+                       Bacteroidetes = "steelblue",  
+                       Chlamydiae = "navy", 
+                       Chloroflexi = "grey",
+                       Cyanobacteria = "purple", 
+                       "Deltaproteobacteria" = "orange",
+                       "Discoba" = "darkslategray1",
+                       Euryarchaeota = "aquamarine", 
+                       "Epsilonproteobacteria" = "darkslateblue",
+                       "Excavata" = "#7CAE00",
+                       "Gammaproteobacteria" = "dimgray",
+                       "Holozoa" = "forestgreen",
+                       "Marine Group I" = "gainsboro",
+                       Marinimicrobia = "darkseagreen1",
+                       Opisthokonta = "magenta", 
+                       Parcubacteria = "chocolate2", 
+                       Planctomycetes = "wheat", 
+                       Proteobacteria = "olivedrab",
+                       "Rhizaria" = "goldenrod",
+                       Thaumarchaeota = "firebrick", 
+                       SAR = "darkred", 
+                       "Stramenopiles" = "darkorchid1",
+                       "Thermoplasmata" = "tan",
+                       Verrucomicrobia = "gold4", 
+                       "Rare Taxa (<1%)" = "black")
+
+
+```
