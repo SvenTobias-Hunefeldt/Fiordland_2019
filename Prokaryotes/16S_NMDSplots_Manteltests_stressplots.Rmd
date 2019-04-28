@@ -1,0 +1,989 @@
+---
+title: "NMDS plots with associated mantel tests - 16S"
+author: "Sven"
+date: "2/22/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+##Notes:
+It is best to go through each dataset (five fjords/horizontal Long Sound community/ Vertical Long Sound community) one by one. So following the order of this file from start to finish.
+
+#Set up
+```{r Load packages}
+library(vegan)
+library(phyloseq)
+library(ggplot2)
+library(dplyr)
+```
+##Import files:
+```{r Set path}
+
+uzdir <- "/Users/sven/Desktop/Project_R_analysis/"
+otutable_biom_file <- paste("/Users/sven/Desktop/Project_R_analysis/", "Merged_otu_table_json.biom", sep = "")
+map_file <- paste("/Users/sven/Desktop/Project_R_analysis/Sorted_out/", "Modified_mapping_file_mod_with_names_and_variables.txt", sep = "")
+
+
+```
+```{r Create phyloseq object}
+# Now import the .biom-formatted otu_table-tax_table file.
+
+biom_otu_tax <- import_biom(otutable_biom_file)
+
+# Add sample data to the dataset using merge
+bmsd <- import_qiime_sample_data(map_file)
+class(bmsd)
+dim(bmsd)
+sample_data(bmsd)
+sample_variables(bmsd)
+biom_otu_tax
+
+
+#Merge into phyloseq format
+Fiord_phyloseq <- merge_phyloseq(biom_otu_tax, bmsd)
+Fiord_phyloseq
+sample_sums(Fiord_phyloseq)
+
+#Save original phyloseq file
+Fiord_phyloseq_v = Fiord_phyloseq
+
+#Fix Misslabel
+Fiord_phyloseq@sam_data$Sample_Depth[Fiord_phyloseq@sam_data$Sample_Depth == 1] = 0
+#Ensure sample depth is seen as a factor for ease of use
+sample_data(Fiord_phyloseq)$Sample_Depth<-as.factor(sample_data(Fiord_phyloseq)$Sample_Depth)
+```
+##Create average result for multiple rarefaction by transforming data using (divide by 10) and check counts per sample
+```{r Create average result for multiple rarefaction by transforming data using (divide by 10), results='markup'}
+Fiord_phyloseq = transform_sample_counts(Fiord_phyloseq, function(x) x/10)
+sample_sums(Fiord_phyloseq)
+```
+#### Round and confirm count number
+```{r Round and confirm count number, results='markup'}
+Fiord_phyloseq = transform_sample_counts(Fiord_phyloseq, round)
+sample_sums(Fiord_phyloseq)
+Fiord_phyloseq = prune_samples(sample_sums(Fiord_phyloseq)>=1, Fiord_phyloseq)
+sample_sums(Fiord_phyloseq)
+```
+Check that all OTUs have representative counts  
+For here taxa = OTU  
+__Commands interpretation:__  
+_Total number of taxa in dataset:_ sum(taxa_sums(Fiord_phyloseq) > 0)   
+
+_Any taxa with no hits:_ any(taxa_sums(Fiord_phyloseq)== 0)
+```{r identify taxa with only zeros, results='markup', echo=TRUE}
+sum(taxa_sums(Fiord_phyloseq) > 0)
+any(taxa_sums(Fiord_phyloseq)== 0)
+sum(taxa_sums(Fiord_phyloseq) == 0)
+any(taxa_sums(Fiord_phyloseq) > 1)
+sum(taxa_sums(Fiord_phyloseq) > 1)
+any(taxa_sums(Fiord_phyloseq) < 1)
+sum(taxa_sums(Fiord_phyloseq) < 1)
+```
+####Prune taxa with less than 1 count and check taxa numbers again
+```{r  Save original file and create new file with only present (no zeroes) taxa, results='markup', echo=TRUE}
+
+#Create new file with only present (no zeroes) taxa
+
+Fiord_phyloseq = prune_taxa(taxa_sums(Fiord_phyloseq) > 1, Fiord_phyloseq)
+any(sample_sums(Fiord_phyloseq) == 0)
+any(sample_sums(Fiord_phyloseq) > 0)
+sum(taxa_sums(Fiord_phyloseq) > 0)
+any(sample_sums(Fiord_phyloseq) < 1)
+sum(taxa_sums(Fiord_phyloseq) < 1)
+```
+##Compare sequences per sample or OTU
+```{r Compare sequences per sample or OTU}
+readsumsdf = data.frame(nreads = sort(taxa_sums(Fiord_phyloseq),TRUE), sorted = 1:ntaxa(Fiord_phyloseq), type = "OTU")
+readsumsdf = rbind(readsumsdf,data.frame(nreads = sort(sample_sums(Fiord_phyloseq),TRUE),sorted = 1:nsamples(Fiord_phyloseq), type = "Samples"))
+
+title = "Total number of reads"
+
+p = ggplot(readsumsdf, aes(x = sorted, y = nreads)) +
+  geom_bar(stat = "identity")
+
+p + ggtitle(title) +
+  scale_y_log10() +
+  facet_wrap(~type, 1, scales = "free")
+```
+```{r What sample variables exist in the phyloseq data}
+sample_variables(Fiord_phyloseq)
+```
+```{r Attached OTU ID}
+tax_table(Fiord_phyloseq) <- cbind(tax_table(Fiord_phyloseq), OTU=taxa_names(Fiord_phyloseq))
+```
+```{r Rename Ranks}
+colnames(tax_table(Fiord_phyloseq)) = c("Domain", "Phylum", "Class", "Order", "Family", "Genus", "Species", "OTU")
+tax_table(Fiord_phyloseq) =gsub("D_0__", "", tax_table(Fiord_phyloseq))
+tax_table(Fiord_phyloseq) =gsub("D_1__", "", tax_table(Fiord_phyloseq))
+tax_table(Fiord_phyloseq) =gsub("D_2__", "", tax_table(Fiord_phyloseq))
+tax_table(Fiord_phyloseq) =gsub("D_3__", "", tax_table(Fiord_phyloseq))
+tax_table(Fiord_phyloseq) =gsub("D_4__", "", tax_table(Fiord_phyloseq))
+tax_table(Fiord_phyloseq) =gsub("D_5__", "", tax_table(Fiord_phyloseq))
+tax_table(Fiord_phyloseq) =gsub("D_6__", "", tax_table(Fiord_phyloseq))
+
+```
+##Subset
+```{r Subset}
+#Subset to in/out
+Fiord_phyloseq_in_out = subset_samples(Fiord_phyloseq, !Sample_type == "Transverse")
+
+#Subset horizontal community
+Fiord_phyloseq_Horonly = subset_samples(Fiord_phyloseq, Sample_type == "Transverse" & !Sample_Depth == "40" & !Sample_Depth == "100" & !Sample_Depth == "200" & !Sample_Depth == "360")
+
+#Subset vertical community
+Fiord_phyloseq_Vert = subset_samples(Fiord_phyloseq, !Sample_type == "in" & !Sample_type == "out")
+Fiord_phyloseq_Vert = subset_samples(Fiord_phyloseq_Vert, Sample_Site == "L5")
+```
+##Phylum colour list for consistency
+```{r Phylum colour list}
+Phylum_colour_list = c(Acidobacteria = "red",
+                       Actinobacteria = "green",
+                       "Alphaproteobacteria" = "burlywood1",
+                       "Alveolata" = "blueviolet",
+                       Archaeplastida = "#F8766D",
+                       Bacteroidetes = "steelblue",  
+                       Chlamydiae = "navy", 
+                       Chloroflexi = "grey",
+                       Cyanobacteria = "purple", 
+                       "Deltaproteobacteria" = "orange",
+                       "Discoba" = "darkslategray1",
+                       Euryarchaeota = "aquamarine", 
+                       "Epsilonproteobacteria" = "darkslateblue",
+                       "Excavata" = "#7CAE00",
+                       "Gammaproteobacteria" = "dimgray",
+                       "Holozoa" = "forestgreen",
+                       "Marine Group I" = "gainsboro",
+                       Marinimicrobia = "darkseagreen1",
+                       Opisthokonta = "magenta", 
+                       Parcubacteria = "chocolate2", 
+                       Planctomycetes = "wheat", 
+                       Proteobacteria = "olivedrab",
+                       "Rhizaria" = "goldenrod",
+                       Thaumarchaeota = "firebrick", 
+                       SAR = "darkred", 
+                       "Stramenopiles" = "darkorchid1",
+                       "Thermoplasmata" = "tan",
+                       Verrucomicrobia = "gold4", 
+                       "Rare Taxa (<1%)" = "black")
+```
+#Five fjords NMDS plot
+```{r Make multifjord NMDS plot}
+NMDS.ord_inout <- ordinate(Fiord_phyloseq_in_out, method = "NMDS", distance = "bray")
+sample_data(Fiord_phyloseq_in_out)$Sample_Depth<-as.factor(sample_data(Fiord_phyloseq_in_out)$Sample_Depth)
+
+Sample_type_depth = c(Bin0 = 2, Bin10 = 0, Bout0 =17, Bout10 = 15, 
+                      Cin0 =2, Cin10 = 0, Cout0 =17, Cout10 = 15,
+                      Doin0 =2, Doin10 = 0, Doout0 =17, Doout10 = 15,
+                      Duin0 =2, Duin10 = 0, Duout0 =17, Duout10 = 15,
+                      Win0 =2, Win10 = 0, Wout0 =17, Wout10 = 15)
+
+Sample_Site_colour = c(B = "red", C = "green", Do = "black", Du = "blue", W = "purple")
+
+NMDS_Multi = plot_ordination(Fiord_phyloseq_in_out, NMDS.ord_inout, shape = "New_Name", color = "Sample_Site") + 
+ scale_shape_manual("Sample location", values=Sample_type_depth, labels = c("In0","In10", "Out0", "Out10"), breaks = c("In0","In10", "Out0", "Out10")) + 
+  scale_colour_manual("Fjord of origin",values = Sample_Site_colour, breaks = c("B", "C", "Do", "Du", "W"), labels = c("Breaksea Sound", "Chalky Inlet", "Doubtful Sound", "Dusky Sound", "Wet Jacket Arm"))+
+  theme(legend.position = "right")
+#open triangle = in0
+#open square = in10
+#closed triangle = out0
+#closed square = out10
+#red = Breaksea
+#green = Chalky
+#black = Doubtful
+#Blue = Dusky
+#Purple = Wet_Jacket
+NMDS_Multi
+
+dev.copy(png,"Sampleplot_triangle", units = "in", width = 6, height = 5, res = 500)
+dev.off()
+
+
+stressplot(NMDS.ord_inout)
+NMDS.ord_inout
+
+
+```
+```{r Export consensus fjord for later ggarrange}
+
+saveRDS(NMDS_Multi,"~/Desktop/To_ggarrange/Multifjord_betadiv_16S.rds")
+saveRDS(NMDS.ord_inout,"~/Desktop/16S_Multi_stressplot.rds")
+```
+#Five fjords Mantel tests
+```{r Set up}
+#Phyloseq to df
+ForBray_df_Genus <- tax_glom(Fiord_phyloseq_in_out, taxrank = 'Genus') %>%#Merge the species at the phylum level
+  transform_sample_counts(function(x) {x/sum(x)} ) %>% #Extract abundance data from phyloseq object
+  psmelt() #Melt into a df
+
+#Subset by Depth
+Bin0_df_Genus = subset(ForBray_df_Genus, Sample_Site == "B" & Sample_Depth == "0" & Sample_type == "in")
+Bin10_df_Genus = subset(ForBray_df_Genus, Sample_Site == "B" & Sample_Depth == "10" & Sample_type == "in")
+Bout0_df_Genus = subset(ForBray_df_Genus, Sample_Site == "B" & Sample_Depth == "0" & Sample_type == "out") 
+Bout10_df_Genus = subset(ForBray_df_Genus, Sample_Site == "B" & Sample_Depth == "10" & Sample_type == "out")
+
+Cin0_df_Genus = subset(ForBray_df_Genus, Sample_Site == "C" & Sample_Depth == "0" & Sample_type == "in")
+Cin10_df_Genus = subset(ForBray_df_Genus, Sample_Site == "C" & Sample_Depth == "10" & Sample_type == "in")
+Cout0_df_Genus = subset(ForBray_df_Genus, Sample_Site == "C" & Sample_Depth == "0" & Sample_type == "out") 
+Cout10_df_Genus = subset(ForBray_df_Genus, Sample_Site == "C" & Sample_Depth == "10" & Sample_type == "out")
+
+Doin0_df_Genus = subset(ForBray_df_Genus, Sample_Site == "Do" & Sample_Depth == "0" & Sample_type == "in")
+Doin10_df_Genus = subset(ForBray_df_Genus, Sample_Site == "Do" & Sample_Depth == "10" & Sample_type == "in")
+Doout0_df_Genus = subset(ForBray_df_Genus, Sample_Site == "Do" & Sample_Depth == "0" & Sample_type == "out") 
+Doout10_df_Genus = subset(ForBray_df_Genus, Sample_Site == "Do" & Sample_Depth == "10" & Sample_type == "out")
+
+Duin0_df_Genus = subset(ForBray_df_Genus, Sample_Site == "Du" & Sample_Depth == "0" & Sample_type == "in")
+Duin10_df_Genus = subset(ForBray_df_Genus, Sample_Site == "Du" & Sample_Depth == "10" & Sample_type == "in")
+Duout0_df_Genus = subset(ForBray_df_Genus, Sample_Site == "Du" & Sample_Depth == "0" & Sample_type == "out") 
+Duout10_df_Genus = subset(ForBray_df_Genus, Sample_Site == "Du" & Sample_Depth == "10" & Sample_type == "out")
+
+Win0_df_Genus = subset(ForBray_df_Genus, Sample_Site == "W" & Sample_Depth == "0" & Sample_type == "in")
+Win10_df_Genus = subset(ForBray_df_Genus, Sample_Site == "W" & Sample_Depth == "10" & Sample_type == "in")
+Wout0_df_Genus = subset(ForBray_df_Genus, Sample_Site == "W" & Sample_Depth == "0" & Sample_type == "out") 
+Wout10_df_Genus = subset(ForBray_df_Genus, Sample_Site == "W" & Sample_Depth == "10" & Sample_type == "out")
+
+
+#Extract Depth, Site, type, genus, and abundnace.
+Bin0_df_Genus = Bin0_df_Genus[,c(3,47,48,49,92)] 
+Bin10_df_Genus = Bin10_df_Genus[,c(3,47,48,49,92)]
+Bout0_df_Genus = Bout0_df_Genus[,c(3,47,48,49,92)]
+Bout10_df_Genus = Bout10_df_Genus[,c(3,47,48,49,92)]
+
+Cin0_df_Genus = Cin0_df_Genus[,c(3,47,48,49,92)] 
+Cin10_df_Genus = Cin10_df_Genus[,c(3,47,48,49,92)]
+Cout0_df_Genus = Cout0_df_Genus[,c(3,47,48,49,92)]
+Cout10_df_Genus = Cout10_df_Genus[,c(3,47,48,49,92)]
+
+Doin0_df_Genus = Doin0_df_Genus[,c(3,47,48,49,92)] 
+Doin10_df_Genus = Doin10_df_Genus[,c(3,47,48,49,92)]
+Doout0_df_Genus = Doout0_df_Genus[,c(3,47,48,49,92)]
+Doout10_df_Genus = Doout10_df_Genus[,c(3,47,48,49,92)]
+
+Duin0_df_Genus = Duin0_df_Genus[,c(3,47,48,49,92)] 
+Duin10_df_Genus = Duin10_df_Genus[,c(3,47,48,49,92)]
+Duout0_df_Genus = Duout0_df_Genus[,c(3,47,48,49,92)]
+Duout10_df_Genus = Duout10_df_Genus[,c(3,47,48,49,92)]
+
+Win0_df_Genus = Win0_df_Genus[,c(3,47,48,49,92)] 
+Win10_df_Genus = Win10_df_Genus[,c(3,47,48,49,92)]
+Wout0_df_Genus = Wout0_df_Genus[,c(3,47,48,49,92)]
+Wout10_df_Genus = Wout10_df_Genus[,c(3,47,48,49,92)]
+
+
+#Transpose data
+trans_Bin0_df_Genus = as.data.frame(t(Bin0_df_Genus[,c(as.numeric(1),as.numeric(2))]))
+colnames(trans_Bin0_df_Genus) = Bin0_df_Genus$Genus
+trans_Bin10_df_Genus = as.data.frame(t(Bin10_df_Genus[,c(as.numeric(1),as.numeric(2))]))
+colnames(trans_Bin10_df_Genus) = Bin10_df_Genus$Genus
+trans_Bout0_df_Genus = as.data.frame(t(Bout0_df_Genus[,c(as.numeric(1),as.numeric(2))]))
+colnames(trans_Bout0_df_Genus) = Bout0_df_Genus$Genus
+trans_Bout10_df_Genus = as.data.frame(t(Bout10_df_Genus[,c(as.numeric(1),as.numeric(2))]))
+colnames(trans_Bout10_df_Genus) = Bout10_df_Genus$Genus
+
+trans_Cin0_df_Genus = as.data.frame(t(Cin0_df_Genus[,c(as.numeric(1),as.numeric(2))]))
+colnames(trans_Cin0_df_Genus) = Cin0_df_Genus$Genus
+trans_Cin10_df_Genus = as.data.frame(t(Cin10_df_Genus[,c(as.numeric(1),as.numeric(2))]))
+colnames(trans_Cin10_df_Genus) = Cin10_df_Genus$Genus
+trans_Cout0_df_Genus = as.data.frame(t(Cout0_df_Genus[,c(as.numeric(1),as.numeric(2))]))
+colnames(trans_Cout0_df_Genus) = Cout0_df_Genus$Genus
+trans_Cout10_df_Genus = as.data.frame(t(Cout10_df_Genus[,c(as.numeric(1),as.numeric(2))]))
+colnames(trans_Cout10_df_Genus) = Cout10_df_Genus$Genus
+
+trans_Doin0_df_Genus = as.data.frame(t(Doin0_df_Genus[,c(as.numeric(1),as.numeric(2))]))
+colnames(trans_Doin0_df_Genus) = Doin0_df_Genus$Genus
+trans_Doin10_df_Genus = as.data.frame(t(Doin10_df_Genus[,c(as.numeric(1),as.numeric(2))]))
+colnames(trans_Doin10_df_Genus) = Doin10_df_Genus$Genus
+trans_Doout0_df_Genus = as.data.frame(t(Doout0_df_Genus[,c(as.numeric(1),as.numeric(2))]))
+colnames(trans_Doout0_df_Genus) = Doout0_df_Genus$Genus
+trans_Doout10_df_Genus = as.data.frame(t(Doout10_df_Genus[,c(as.numeric(1),as.numeric(2))]))
+colnames(trans_Doout10_df_Genus) = Doout10_df_Genus$Genus
+
+trans_Duin0_df_Genus = as.data.frame(t(Duin0_df_Genus[,c(as.numeric(1),as.numeric(2))]))
+colnames(trans_Duin0_df_Genus) = Duin0_df_Genus$Genus
+trans_Duin10_df_Genus = as.data.frame(t(Duin10_df_Genus[,c(as.numeric(1),as.numeric(2))]))
+colnames(trans_Duin10_df_Genus) = Duin10_df_Genus$Genus
+trans_Duout0_df_Genus = as.data.frame(t(Duout0_df_Genus[,c(as.numeric(1),as.numeric(2))]))
+colnames(trans_Duout0_df_Genus) = Duout0_df_Genus$Genus
+trans_Duout10_df_Genus = as.data.frame(t(Duout10_df_Genus[,c(as.numeric(1),as.numeric(2))]))
+colnames(trans_Duout10_df_Genus) = Duout10_df_Genus$Genus
+
+trans_Win0_df_Genus = as.data.frame(t(Win0_df_Genus[,c(as.numeric(1),as.numeric(2))]))
+colnames(trans_Win0_df_Genus) = Win0_df_Genus$Genus
+trans_Win10_df_Genus = as.data.frame(t(Win10_df_Genus[,c(as.numeric(1),as.numeric(2))]))
+colnames(trans_Win10_df_Genus) = Win10_df_Genus$Genus
+trans_Wout0_df_Genus = as.data.frame(t(Wout0_df_Genus[,c(as.numeric(1),as.numeric(2))]))
+colnames(trans_Wout0_df_Genus) = Wout0_df_Genus$Genus
+trans_Wout10_df_Genus = as.data.frame(t(Wout10_df_Genus[,c(as.numeric(1),as.numeric(2))]))
+colnames(trans_Wout10_df_Genus) = Wout10_df_Genus$Genus
+
+#Get mean at Genus level
+Bin0_Genus_mean = as.data.frame(sapply(split.default(trans_Bin0_df_Genus, names(trans_Bin0_df_Genus)), rowMeans))
+Bin10_Genus_mean = as.data.frame(sapply(split.default(trans_Bin10_df_Genus, names(trans_Bin10_df_Genus)), rowMeans))
+Bout0_Genus_mean = as.data.frame(sapply(split.default(trans_Bout0_df_Genus, names(trans_Bout0_df_Genus)), rowMeans))
+Bout10_Genus_mean = as.data.frame(sapply(split.default(trans_Bout10_df_Genus, names(trans_Bout10_df_Genus)), rowMeans))
+
+Cin0_Genus_mean = as.data.frame(sapply(split.default(trans_Cin0_df_Genus, names(trans_Cin0_df_Genus)), rowMeans))
+Cin10_Genus_mean = as.data.frame(sapply(split.default(trans_Cin10_df_Genus, names(trans_Cin10_df_Genus)), rowMeans))
+Cout0_Genus_mean = as.data.frame(sapply(split.default(trans_Cout0_df_Genus, names(trans_Cout0_df_Genus)), rowMeans))
+Cout10_Genus_mean = as.data.frame(sapply(split.default(trans_Cout10_df_Genus, names(trans_Cout10_df_Genus)), rowMeans))
+
+Doin0_Genus_mean = as.data.frame(sapply(split.default(trans_Doin0_df_Genus, names(trans_Doin0_df_Genus)), rowMeans))
+Doin10_Genus_mean = as.data.frame(sapply(split.default(trans_Doin10_df_Genus, names(trans_Doin10_df_Genus)), rowMeans))
+Doout0_Genus_mean = as.data.frame(sapply(split.default(trans_Doout0_df_Genus, names(trans_Doout0_df_Genus)), rowMeans))
+Doout10_Genus_mean = as.data.frame(sapply(split.default(trans_Doout10_df_Genus, names(trans_Doout10_df_Genus)), rowMeans))
+
+Duin0_Genus_mean = as.data.frame(sapply(split.default(trans_Duin0_df_Genus, names(trans_Duin0_df_Genus)), rowMeans))
+Duin10_Genus_mean = as.data.frame(sapply(split.default(trans_Duin10_df_Genus, names(trans_Duin10_df_Genus)), rowMeans))
+Duout0_Genus_mean = as.data.frame(sapply(split.default(trans_Duout0_df_Genus, names(trans_Duout0_df_Genus)), rowMeans))
+Duout10_Genus_mean = as.data.frame(sapply(split.default(trans_Duout10_df_Genus, names(trans_Duout10_df_Genus)), rowMeans))
+
+Win0_Genus_mean = as.data.frame(sapply(split.default(trans_Win0_df_Genus, names(trans_Win0_df_Genus)), rowMeans))
+Win10_Genus_mean = as.data.frame(sapply(split.default(trans_Win10_df_Genus, names(trans_Win10_df_Genus)), rowMeans))
+Wout0_Genus_mean = as.data.frame(sapply(split.default(trans_Wout0_df_Genus, names(trans_Wout0_df_Genus)), rowMeans))
+Wout10_Genus_mean = as.data.frame(sapply(split.default(trans_Wout10_df_Genus, names(trans_Wout10_df_Genus)), rowMeans))
+
+#Bind into one df
+ForBray_Genus_df_num = rbind(Bin0_Genus_mean, 
+                         Bin10_Genus_mean, 
+                         Bout0_Genus_mean,
+                         Bout10_Genus_mean, 
+                         Cin0_Genus_mean, 
+                         Cin10_Genus_mean, 
+                         Cout0_Genus_mean,
+                         Cout10_Genus_mean,
+                         Doin0_Genus_mean, 
+                         Doin10_Genus_mean, 
+                         Doout0_Genus_mean,
+                         Doout10_Genus_mean,
+                         Duin0_Genus_mean, 
+                         Duin10_Genus_mean, 
+                         Duout0_Genus_mean,
+                         Duout10_Genus_mean,
+                         Win0_Genus_mean, 
+                         Win10_Genus_mean, 
+                         Wout0_Genus_mean,
+                         Wout10_Genus_mean)
+
+
+#Remove excess rows
+ForBray_Genus_df_num = ForBray_Genus_df_num[-c(2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32,34,36,38,40),]
+
+ForBray_Genus_df = ForBray_Genus_df_num
+
+#Add sample depth as a column
+ForBray_Genus_df$Sample_Depth = c(0,10,0,10,0,10,0,10,0,10,
+                                      0,10,0,10,0,10,0,10,0,10)
+ForBray_Genus_df$Sample_type = as.factor(c("in","in","out","out",
+                                           "in","in","out","out",
+                                           "in","in","out","out",
+                                           "in","in","out","out",
+                                           "in","in","out","out"))
+ForBray_Genus_df$Sample_Site = as.factor(c("B","B","B","B",
+                                           "C","C","C","C",
+                                           "Do","Do","Do","Do",
+                                           "Du","Du","Du","Du",
+                                           "W","W","W","W"))
+
+```
+```{r Carry out the Mantel test}
+
+#Make distance matrix:
+Allmicrobes_adonis.dist = dist(cbind(ForBray_Genus_df[,c(1:947)]))
+
+Depth.dist = dist(ForBray_Genus_df$Sample_Depth)
+Region.dist = dist(cbind(ForBray_Genus_df$Sample_type))
+Fjord.dist= dist(cbind(ForBray_Genus_df$Sample_Site))
+DepthxRegion.dist = dist(cbind(ForBray_Genus_df$Sample_Depth,
+                               ForBray_Genus_df$Sample_type))
+DepthxFjord.dist = dist(cbind(ForBray_Genus_df$Sample_Depth,
+                               ForBray_Genus_df$Sample_Site))
+RegionxFjord.dist = dist(cbind(ForBray_Genus_df$Sample_type,
+                               ForBray_Genus_df$Sample_Site))
+DepthxRegionxFjord.dist = dist(cbind(ForBray_Genus_df$Sample_Depth,
+                               ForBray_Genus_df$Sample_type,
+                               ForBray_Genus_df$Sample_Site))
+
+CTD.dist = dist(cbind(DFformantel$Temperature,
+                      DFformantel$OxygenPerSat, 
+                      DFformantel$Salinity))
+Salinity.dist = dist(cbind(DFformantel$Salinity))
+Oxygen.dist = dist(cbind(DFformantel$OxygenPerSat))
+Temperature.dist = dist(cbind(DFformantel$Temperature))
+
+mantel(Allmicrobes_adonis.dist,
+              Depth.dist)
+mantel(Allmicrobes_adonis.dist,
+              Region.dist)
+mantel(Allmicrobes_adonis.dist,
+              Fjord.dist)
+mantel(Allmicrobes_adonis.dist,
+       DepthxRegion.dist)
+mantel(Allmicrobes_adonis.dist,
+       DepthxFjord.dist)
+mantel(Allmicrobes_adonis.dist,
+       RegionxFjord.dist)
+mantel(Allmicrobes_adonis.dist,
+       DepthxRegionxFjord.dist)
+
+mantel(Allmicrobes_adonis.dist,
+       CTD.dist)
+mantel(Allmicrobes_adonis.dist,
+       Salinity.dist)
+mantel(Allmicrobes_adonis.dist,
+       Oxygen.dist)
+mantel(Allmicrobes_adonis.dist,
+       Temperature.dist)
+
+```
+#Horizontal NMDS plot
+```{r Make horizontal community NMDS plot}
+
+NMDS.ord_Hor <- ordinate(Fiord_phyloseq_Horonly, method = "NMDS", distance = "bray")
+
+#Add distances to the phyloseq object for accuracy (rather than using stations)
+Fiord_phyloseq_Horonly@sam_data$Distance[Fiord_phyloseq_Horonly@sam_data$Sample_Site == "L1"] = 0
+Fiord_phyloseq_Horonly@sam_data$Distance[Fiord_phyloseq_Horonly@sam_data$Sample_Site == "L2"] = 5.59
+Fiord_phyloseq_Horonly@sam_data$Distance[Fiord_phyloseq_Horonly@sam_data$Sample_Site == "L3"] = 14.3
+Fiord_phyloseq_Horonly@sam_data$Distance[Fiord_phyloseq_Horonly@sam_data$Sample_Site == "L4"] = 10.67
+Fiord_phyloseq_Horonly@sam_data$Distance[Fiord_phyloseq_Horonly@sam_data$Sample_Site == "L5"] = 8.47
+Fiord_phyloseq_Horonly@sam_data$Distance[Fiord_phyloseq_Horonly@sam_data$Sample_Site == "L6"] = 4.73
+Fiord_phyloseq_Horonly@sam_data$Distance[Fiord_phyloseq_Horonly@sam_data$Sample_Site == "L7"] = 3.16
+Fiord_phyloseq_Horonly@sam_data$Distance[Fiord_phyloseq_Horonly@sam_data$Sample_Site == "L8"] = 2.47
+
+
+NMDS_Hor = plot_ordination(Fiord_phyloseq_Horonly, 
+                             NMDS.ord_Hor, 
+                             label = "Distance", 
+                             color = "Sample_Depth") +
+geom_point(size = 4)+ 
+  scale_color_manual("Sample \nDepth (m)", values = Depth_colour_list, breaks = c("0", "10"), labels = c("0", "10"))+
+  theme(legend.position = "right")+
+  geom_label(label = Fiord_phyloseq_Horonly@sam_data[["Distance"]])
+NMDS_Hor
+
+stressplot(NMDS.ord_Hor)
+NMDS.ord_Hor
+```
+```{r Export horizontal fjord for later ggarrange}
+saveRDS(NMDS_Hor,"~/Desktop/To_ggarrange/Transect_betadiv_16S.rds")
+saveRDS(NMDS.ord_Hor,"~/Desktop/16S_Transect_stressplot.rds")
+```
+#Horizontal community Mantel tests
+```{r Set up for horizontal Long Sound community}
+
+#Phyloseq to df
+ForBray_df <- tax_glom(Fiord_phyloseq_Horonly, taxrank = 'Genus') %>%#Merge the species at the phylum level
+  transform_sample_counts(function(x) {x/sum(x)} ) %>% #Extract abundance data from phyloseq object
+  psmelt() #Melt into a df
+
+#Add distance from L1 to df based on sample site based on:
+##Distance_list_surface = c("L1z1" = 0, "L2z0" = 5.59, "L3z0" = 14.3, "L4z0" = 10.67, "L5z0" = 8.47, "L6z0" = 4.73, "L7z0" = 3.16, "L8z0" = 2.47)
+ForBray_df$Distancefrom_L1[grep("L1", ForBray_df$New_Name)] = 0
+ForBray_df$Distancefrom_L1[grep("L2", ForBray_df$New_Name)] = as.numeric(5.59)
+ForBray_df$Distancefrom_L1[grep("L3", ForBray_df$New_Name)] = as.numeric(14.3)
+ForBray_df$Distancefrom_L1[grep("L4", ForBray_df$New_Name)] = as.numeric(10.67)
+ForBray_df$Distancefrom_L1[grep("L5", ForBray_df$New_Name)] = as.numeric(8.47)
+ForBray_df$Distancefrom_L1[grep("L6", ForBray_df$New_Name)] = as.numeric(4.73)
+ForBray_df$Distancefrom_L1[grep("L7", ForBray_df$New_Name)] = as.numeric(3.16)
+ForBray_df$Distancefrom_L1[grep("L8", ForBray_df$New_Name)] = as.numeric(2.47)
+
+#Subset by Site and depth
+L1_df_Genus_surface = subset(ForBray_df, Sample_Site == "L1" & Sample_Depth == "1")
+L2_df_Genus_surface = subset(ForBray_df, Sample_Site == "L2" & Sample_Depth == "0")
+L3_df_Genus_surface = subset(ForBray_df, Sample_Site == "L3" & Sample_Depth == "0")
+L4_df_Genus_surface = subset(ForBray_df, Sample_Site == "L4" & Sample_Depth == "0")
+L5_df_Genus_surface = subset(ForBray_df, Sample_Site == "L5" & Sample_Depth == "0")
+L6_df_Genus_surface = subset(ForBray_df, Sample_Site == "L6" & Sample_Depth == "0")
+L7_df_Genus_surface = subset(ForBray_df, Sample_Site == "L7" & Sample_Depth == "0")
+L8_df_Genus_surface = subset(ForBray_df, Sample_Site == "L8" & Sample_Depth == "0")
+
+L1_df_Genus_10m = subset(ForBray_df, Sample_Site == "L1" & Sample_Depth == "10")
+L2_df_Genus_10m = subset(ForBray_df, Sample_Site == "L2" & Sample_Depth == "10")
+L3_df_Genus_10m = subset(ForBray_df, Sample_Site == "L3" & Sample_Depth == "10")
+L4_df_Genus_10m = subset(ForBray_df, Sample_Site == "L4" & Sample_Depth == "10")#This doesn't contain data.
+L5_df_Genus_10m = subset(ForBray_df, Sample_Site == "L5" & Sample_Depth == "10")
+L6_df_Genus_10m = subset(ForBray_df, Sample_Site == "L6" & Sample_Depth == "10")#This doesn't contain data.
+L7_df_Genus_10m = subset(ForBray_df, Sample_Site == "L7" & Sample_Depth == "10")#This doesn't contain data.
+L8_df_Genus_10m = subset(ForBray_df, Sample_Site == "L8" & Sample_Depth == "10")#This doesn't contain data.
+
+#Extract only info I need
+L1_df_Genus_surface = L1_df_Genus_surface[,c(3,92,93)]
+L2_df_Genus_surface = L2_df_Genus_surface[,c(3,92,93)]
+L3_df_Genus_surface = L3_df_Genus_surface[,c(3,92,93)]
+L4_df_Genus_surface = L4_df_Genus_surface[,c(3,92,93)]
+L5_df_Genus_surface = L5_df_Genus_surface[,c(3,92,93)]
+L6_df_Genus_surface = L6_df_Genus_surface[,c(3,92,93)]
+L7_df_Genus_surface = L7_df_Genus_surface[,c(3,92,93)]
+L8_df_Genus_surface = L8_df_Genus_surface[,c(3,92,93)]
+
+L1_df_Genus_10m = L1_df_Genus_10m[,c(3,92,93)]
+L2_df_Genus_10m = L2_df_Genus_10m[,c(3,92,93)]
+L3_df_Genus_10m = L3_df_Genus_10m[,c(3,92,93)]
+L5_df_Genus_10m = L5_df_Genus_10m[,c(3,92,93)]
+
+#Transpose data
+trans_L1_df_Genus_surface = as.data.frame(t(L1_df_Genus_surface[,c(as.numeric(1),as.numeric(3))]))
+colnames(trans_L1_df_Genus_surface) = L1_df_Genus_surface$Genus
+trans_L2_df_Genus_surface = as.data.frame(t(L2_df_Genus_surface[,(c(as.numeric(1),as.numeric(3)))]))
+colnames(trans_L2_df_Genus_surface) = L2_df_Genus_surface$Genus
+trans_L3_df_Genus_surface = as.data.frame(t(L3_df_Genus_surface[,c(as.numeric(1),as.numeric(3))]))
+colnames(trans_L3_df_Genus_surface) = L3_df_Genus_surface$Genus
+trans_L4_df_Genus_surface = as.data.frame(t(L4_df_Genus_surface[,c(as.numeric(1),as.numeric(3))]))
+colnames(trans_L4_df_Genus_surface) = L4_df_Genus_surface$Genus
+trans_L5_df_Genus_surface = as.data.frame(t(L5_df_Genus_surface[,c(as.numeric(1),as.numeric(3))]))
+colnames(trans_L5_df_Genus_surface) = L5_df_Genus_surface$Genus
+trans_L6_df_Genus_surface = as.data.frame(t(L6_df_Genus_surface[,c(as.numeric(1),as.numeric(3))]))
+colnames(trans_L6_df_Genus_surface) = L6_df_Genus_surface$Genus
+trans_L7_df_Genus_surface = as.data.frame(t(L7_df_Genus_surface[,c(as.numeric(1),as.numeric(3))]))
+colnames(trans_L7_df_Genus_surface) = L7_df_Genus_surface$Genus
+trans_L8_df_Genus_surface = as.data.frame(t(L8_df_Genus_surface[,c(as.numeric(1),as.numeric(3))]))
+colnames(trans_L8_df_Genus_surface) = L8_df_Genus$Genus
+
+trans_L1_df_Genus_10m = as.data.frame(t(L1_df_Genus_10m[,c(as.numeric(1),as.numeric(3))]))
+colnames(trans_L1_df_Genus_10m) = L1_df_Genus_10m$Genus
+trans_L2_df_Genus_10m = as.data.frame(t(L2_df_Genus_10m[,(c(as.numeric(1),as.numeric(3)))]))
+colnames(trans_L2_df_Genus_10m) = L2_df_Genus_10m$Genus
+trans_L3_df_Genus_10m = as.data.frame(t(L3_df_Genus_10m[,c(as.numeric(1),as.numeric(3))]))
+colnames(trans_L3_df_Genus_10m) = L3_df_Genus_10m$Genus
+trans_L4_df_Genus_10m = as.data.frame(t(L4_df_Genus_10m[,c(as.numeric(1),as.numeric(3))]))
+colnames(trans_L4_df_Genus_10m) = L4_df_Genus_10m$Genus
+trans_L5_df_Genus_10m = as.data.frame(t(L5_df_Genus_10m[,c(as.numeric(1),as.numeric(3))]))
+colnames(trans_L5_df_Genus_10m) = L5_df_Genus_10m$Genus
+trans_L6_df_Genus_10m = as.data.frame(t(L6_df_Genus_10m[,c(as.numeric(1),as.numeric(3))]))
+colnames(trans_L6_df_Genus_10m) = L6_df_Genus_10m$Genus
+trans_L7_df_Genus_10m = as.data.frame(t(L7_df_Genus_10m[,c(as.numeric(1),as.numeric(3))]))
+colnames(trans_L7_df_Genus_10m) = L7_df_Genus_10m$Genus
+trans_L8_df_Genus_10m = as.data.frame(t(L8_df_Genus_10m[,c(as.numeric(1),as.numeric(3))]))
+colnames(trans_L8_df_Genus) = L8_df_Genus$Genus
+
+#Get mean at Genus level
+L1_Phyla_mean_surface = as.data.frame(sapply(split.default(trans_L1_df_Genus_surface, names(trans_L1_df_Genus_surface)), rowMeans))
+L2_Phyla_mean_surface = as.data.frame(sapply(split.default(trans_L2_df_Genus_surface, names(trans_L2_df_Genus_surface)), rowMeans))
+L3_Phyla_mean_surface = as.data.frame(sapply(split.default(trans_L3_df_Genus_surface, names(trans_L3_df_Genus_surface)), rowMeans))
+L4_Phyla_mean_surface = as.data.frame(sapply(split.default(trans_L4_df_Genus_surface, names(trans_L4_df_Genus_surface)), rowMeans))
+L5_Phyla_mean_surface = as.data.frame(sapply(split.default(trans_L5_df_Genus_surface, names(trans_L5_df_Genus_surface)), rowMeans))
+L6_Phyla_mean_surface = as.data.frame(sapply(split.default(trans_L6_df_Genus_surface, names(trans_L6_df_Genus_surface)), rowMeans))
+L7_Phyla_mean_surface = as.data.frame(sapply(split.default(trans_L7_df_Genus_surface, names(trans_L7_df_Genus_surface)), rowMeans))
+L8_Phyla_mean_surface = as.data.frame(sapply(split.default(trans_L8_df_Genus_surface, names(trans_L8_df_Genus_surface)), rowMeans))
+
+L1_Phyla_mean_10m = as.data.frame(sapply(split.default(trans_L1_df_Genus_10m, names(trans_L1_df_Genus_10m)), rowMeans))
+L2_Phyla_mean_10m = as.data.frame(sapply(split.default(trans_L2_df_Genus_10m, names(trans_L2_df_Genus_10m)), rowMeans))
+L3_Phyla_mean_10m = as.data.frame(sapply(split.default(trans_L3_df_Genus_10m, names(trans_L3_df_Genus_10m)), rowMeans))
+L5_Phyla_mean_10m = as.data.frame(sapply(split.default(trans_L5_df_Genus_10m, names(trans_L5_df_Genus_10m)), rowMeans))
+
+#Bind into one df
+ForBray_Genus_df_num_surface = rbind(L1_Phyla_mean_surface, L2_Phyla_mean_surface, L3_Phyla_mean_surface, L4_Phyla_mean_surface, L5_Phyla_mean_surface, L6_Phyla_mean_surface, L7_Phyla_mean_surface, L8_Phyla_mean_surface)
+
+ForBray_Genus_df_num_10m = rbind(L1_Phyla_mean_10m, L2_Phyla_mean_10m, L3_Phyla_mean_10m, L5_Phyla_mean_10m)
+
+#Add column for distance from L1 and rownames.
+rownames(ForBray_Genus_df_num_surface) = c("L1", "L1d", "L2", "L2d", "L3", "L3d", "L4", "L4d", "L5", "L5d", "L6", "L6d", "L7", "L7d", "L8", "L8d")
+
+rownames(ForBray_Genus_df_num_10m) = c("L1", "L1d", "L2", "L2d", "L3", "L3d", "L5", "L5d")
+
+ForBray_Genus_surface_df = ForBray_Genus_df_num_surface
+ForBray_Genus_10m_df = ForBray_Genus_df_num_10m
+
+ForBray_Genus_surface_df$Distancefrom_L1 = c(0,0,5.59,5.59,14.3,14.3,10.67,10.67,8.47,8.47,4.73,4.73,3.16,3.16,2.47,2.47)
+ForBray_Genus_10m_df$Distancefrom_L1 = c(0,0,5.59,5.59,14.3,14.3,8.47,8.47)
+
+#Remove excess rows
+ForBray_Genus_surface_df = ForBray_Genus_surface_df[-c(2,4,6,8,10,12,14,16),]
+ForBray_Genus_10m_df = ForBray_Genus_10m_df[-c(2,4,6,8,10),]
+
+write.csv(ForBray_Genus_surface_df, "ForBray_Genus_surface_df.csv")
+write.csv(ForBray_Genus_10m_df, "ForBray_Genus_10m_df.csv")
+
+#Then combine in excel and import
+
+```
+```{r Carry out mantel test for horizontal Long Sound community}
+
+#Import combined dataframe
+ForBray_Genus_df = read.csv("All_micro_Hor_16S.csv")
+
+#Make distance matrices:
+Allmicrobes_mantel.dist = dist(cbind(ForBray_Genus_df[,c(1:947)]))
+Depth.dist = dist(cbind(ForBray_Genus_df[,c(949)]))
+Region.dist = dist(cbind(ForBray_Genus_df[,c(948)]))
+DepthxRegion.dist = dist(cbind(ForBray_Genus_df[,c(948:949)]))
+
+CTDfor_mantel_df = Hor_CTD_mantel_df[-c(8,12,14,16),]
+CTDfor_mantel_df %>% arrange(Depth)
+
+CTD.dist = dist(cbind(CTDfor_mantel_df[,c(1:3)]))
+Salinity.dist = dist(cbind(CTDfor_mantel_df[,c(3)]))
+Temperature.dist = dist(cbind(CTDfor_mantel_df[,c(1)]))
+Oxygen.dist = dist(cbind(CTDfor_mantel_df[,c(2)]))
+
+#Run mantel test (using mantel() from the vegan library)
+mantel(Allmicrobes_mantel.dist,
+       Depth.dist)
+mantel(Allmicrobes_mantel.dist,
+       Region.dist)
+mantel(Allmicrobes_mantel.dist,
+       DepthxRegion.dist)
+
+mantel(Allmicrobes_mantel.dist,
+       CTD.dist)
+mantel(Allmicrobes_mantel.dist,
+       Salinity.dist)
+mantel(Allmicrobes_mantel.dist,
+       Oxygen.dist)
+mantel(Allmicrobes_mantel.dist,
+       Temperature.dist)
+
+```
+#Horizontal community Anosim tests
+```{r Horizontal community Anosim test}
+Depth_group = get_variable(Fiord_phyloseq_Horonly@sam_data, "Sample_Depth")
+Depth_ano = anosim(phyloseq::distance(Fiord_phyloseq_Horonly, "bray"), Depth_group)
+Depth_ano$signif
+Depth_ano$statistic
+
+
+```
+#Horizontal community Adonis tests
+```{r Horizontal community Adonis test}
+Depth_group = get_variable(Fiord_phyloseq_Horonly@sam_data, "Sample_Depth")
+df_tran = as(sample_data(Fiord_phyloseq_Horonly), "data.frame")
+df_tran.dist = phyloseq::distance(Fiord_phyloseq_Horonly, "bray")
+Depth_ado = adonis(df_tran.dist ~ Depth_group)
+
+Depth_ado
+
+
+```
+#Horizontal community physicochemical parameter regression
+```{r PP surface}
+#Import dataframe and arrange by distance from outermost sample
+CTD_10m_df = read.csv("Hor_PP_surface.csv") 
+Arranged_CTD_surface_df = arrange(CTD_surface_df, Distancefrom_L1)
+
+#Make the plot
+par(mar = c(5,5,2,5)) #Define plot margins
+with(plot(Arranged_CTD_surface_df$Distancefrom_L1, #X-axis 
+          Arranged_CTD_surface_df$Temperature, #Y-axis
+     col = "red",  #Colour
+     type = "l", #Plot type
+     xlab = "Distance from the outermost sample (km)", #X-axis label
+     ylab = "Temperature (˚C) and Oxygen Saturation (%)",
+     ylim = c(5,13))) #Y-axis label
+
+par(new = T)
+with(plot(Arranged_CTD_surface_df$Distancefrom_L1, #X-axis
+          Arranged_CTD_surface_df$Salinity, #Y-axis
+          col = "blue", #Make the line blue
+          type = "l", #Make it a line graph
+          xlab = NA, #Exclude the x axis label
+          ylab = NA, #Exclude the y axis label
+          ylim = c(27,34), #Set y axis limit for salinity
+          axes = F, #Exclude the axes for this one
+          cex = 1)) #Normal size of plots
+
+axis(side = 4) #Make the second axis on the right
+
+mtext(side = 4,line = 2.75, "Salinity (ppt)") #Define the second axis label.
+
+par(new = T)
+with(plot(Arranged_CTD_surface_df$Distancefrom_L1, #X-axis
+          Arranged_CTD_surface_df$OxygenPerSat, #Y-axis
+          col = "green", #Make the line green
+          type = "l", #Make it a line graph
+          xlab = NA, #Exclude the x axis label
+          ylab = NA, #Exclude the y axis label
+          axes = F, #Exclude the axes for this one
+          cex = 1,
+          ylim = c(5,13))) #Normal size of plots
+
+
+
+legend("bottomright",
+       legend = c("Temperature", "Salinity", "Oxygen"),
+       lty = c(1,0), 
+       pch = c(NA,16), 
+       col = c("red", "blue", "green"),
+       cex = 0.75)
+
+#Save the plot
+Surface_CTD_regression = recordPlot()
+
+```
+```{r PP 10 m}
+#Import dataframe and arrange by distance from outermost sample
+CTD_10m_df = read.csv("Hor_PP_10m.csv")
+Arranged_CTD_10m_df = arrange(CTD_10m_df, Distancefrom_L1)
+
+#Make the plot
+par(mar = c(5,5,2,5)) #Define plot margins
+with(plot(Arranged_CTD_10m_df$Distancefrom_L1, #X-axis 
+          Arranged_CTD_10m_df$Temperature, #Y-axis
+     col = "red",  #Colour
+     type = "l", #Plot type
+     xlab = "Distance from the outermost sample (km)", #X-axis label
+     ylab = "Temperature (˚C) and Oxygen Saturation (%)", #Y-axis label
+     ylim = c(5,13))) 
+
+par(new = T)
+with(plot(Arranged_CTD_10m_df$Distancefrom_L1, #X-axis
+          Arranged_CTD_10m_df$Salinity, #Y-axis
+          col = "blue", #Make the line blue
+          type = "l", #Make it a line graph
+          xlab = NA, #Exclude the x axis label
+          ylab = NA, #Exclude the y axis label
+          ylim = c(27,34), #Set y axis limit for salinity
+          axes = F, #Exclude the axes for this one
+          cex = 1)) #Normal size of plots
+
+axis(side = 4) #Make the second axis on the right
+
+mtext(side = 4,line = 2.75, "Salinity (ppt)") #Define the second axis label.
+
+par(new = T)
+with(plot(Arranged_CTD_10m_df$Distancefrom_L1, #X-axis
+          Arranged_CTD_10m_df$OxygenPerSat, #Y-axis
+          col = "green", #Make the line green
+          type = "l", #Make it a line graph
+          xlab = NA, #Exclude the x axis label
+          ylab = NA, #Exclude the y axis label
+          axes = F, #Exclude the axes for this one
+          cex = 1,
+          ylim = c(5,13)
+          )) #Normal size of plots
+
+
+
+legend("right",
+       legend = c("Temperature", "Salinity", "Oxygen"),
+       lty = c(1,0), 
+       pch = c(NA,16), 
+       col = c("red", "blue", "green"),
+       cex = 0.75)
+#Save the plot
+D10_CTD_regression = recordPlot()
+
+```
+```{r Export horizontal regressions for ggarrange}
+saveRDS(Surface_CTD_regression,"~/Desktop/To_ggarrange/surface_CTD_regression.rds")
+saveRDS(D10_CTD_regression,"~/Desktop/Fjordpaper/3_Results/11_To_ggarrange/10m_CTD_regression.rds")
+
+```
+#Vertical NMDS plot
+```{r Make vertical community NMDS plot}
+NMDS.ord_Vert <- ordinate(Fiord_phyloseq_Vert, method = "NMDS", distance = "bray")
+sample_data(Fiord_phyloseq_Vert)$Sample_Depth<-as.factor(sample_data(Fiord_phyloseq_Vert)$Sample_Depth)
+
+Depth_colour_list = c("0" = "red", "10" = "blue", "40" = "grey", "100" = "green", "200" = "black", "360" = "magenta")
+
+
+sampleplot = plot_ordination(Fiord_phyloseq_Vert, NMDS.ord_Vert, color = "Sample_Depth") +
+  scale_colour_manual("Sample Depth \n (m)", values = Depth_colour_list) +
+  theme(legend.position = "right")+
+  geom_point(position = position_jitter(h=0.1,w=0.1))
+  
+
+sampleplot
+
+NMDS.ord_Vert
+stressplot(NMDS.ord_Vert)
+
+```
+```{r Export vertical plots for later ggarrange}
+saveRDS(sampleplot,"~/Desktop/To_ggarrange/Profile_betadiv_16S.rds")
+saveRDS(NMDS.ord_Vert,"~/Desktop/16S_Profile_stressplot.rds")
+```
+#Vertical community Mantel tests
+```{r Set up for vertical Long Sound community}
+#Phyloseq to df
+ForBray_df_Genus <- tax_glom(Fiord_phyloseq_Vert, taxrank = 'Genus') %>%#Merge the species at the phylum level
+  transform_sample_counts(function(x) {x/sum(x)} ) %>% #Extract abundance data from phyloseq object
+  psmelt() #Melt into a df
+
+#Subset by Depth
+D0_df_Genus = subset(ForBray_df_Genus, Sample_Depth == "0" )
+D10_df_Genus = subset(ForBray_df_Genus,Sample_Depth == "10")
+D40_df_Genus = subset(ForBray_df_Genus, Sample_Depth == "40") 
+D100_df_Genus = subset(ForBray_df_Genus, Sample_Depth == "100" )
+D200_df_Genus = subset(ForBray_df_Genus, Sample_Depth == "200")
+D360_df_Genus = subset(ForBray_df_Genus,Sample_Depth == "360")
+
+
+#Extract Depth, Site, type, genus, and abundnace.
+D0_df_Genus = D0_df_Genus[,c(3,47,92)] 
+D10_df_Genus = D10_df_Genus[,c(3,47,92)]
+D40_df_Genus = D40_df_Genus[,c(3,47,92)]
+D100_df_Genus = D100_df_Genus[,c(3,47,92)]
+D200_df_Genus = D200_df_Genus[,c(3,47,92)] 
+D360_df_Genus = D360_df_Genus[,c(3,47,92)]
+
+#I hate R - make sample depth numeric
+D0_df_Genus$Sample_Depth = as.numeric(as.character(D0_df_Genus$Sample_Depth))
+D10_df_Genus$Sample_Depth = as.numeric(as.character(D10_df_Genus$Sample_Depth))
+D40_df_Genus$Sample_Depth = as.numeric(as.character(D40_df_Genus$Sample_Depth))
+D100_df_Genus$Sample_Depth = as.numeric(as.character(D100_df_Genus$Sample_Depth))
+D200_df_Genus$Sample_Depth = as.numeric(as.character(D200_df_Genus$Sample_Depth))
+D360_df_Genus$Sample_Depth = as.numeric(as.character(D360_df_Genus$Sample_Depth))
+
+#Transpose data
+trans_D0_df_Genus = as.data.frame(t(D0_df_Genus[,c(as.numeric(1),as.numeric(2))]))
+colnames(trans_D0_df_Genus) = D0_df_Genus$Genus
+trans_D10_df_Genus = as.data.frame(t(D10_df_Genus[,c(as.numeric(1),as.numeric(2))]))
+colnames(trans_D10_df_Genus) = D10_df_Genus$Genus
+trans_D40_df_Genus = as.data.frame(t(D40_df_Genus[,c(as.numeric(1),as.numeric(2))]))
+colnames(trans_D40_df_Genus) = D40_df_Genus$Genus
+trans_D100_df_Genus = as.data.frame(t(D100_df_Genus[,c(as.numeric(1),as.numeric(2))]))
+colnames(trans_D100_df_Genus) = D100_df_Genus$Genus
+trans_D200_df_Genus = as.data.frame(t(D200_df_Genus[,c(as.numeric(1),as.numeric(2))]))
+colnames(trans_D200_df_Genus) = D200_df_Genus$Genus
+trans_D360_df_Genus = as.data.frame(t(D360_df_Genus[,c(as.numeric(1),as.numeric(2))]))
+colnames(trans_D360_df_Genus) = D360_df_Genus$Genus
+
+
+#Get mean at Genus level
+D0_Genus_mean = as.data.frame(sapply(split.default(trans_D0_df_Genus, names(trans_D0_df_Genus)), rowMeans))
+D10_Genus_mean = as.data.frame(sapply(split.default(trans_D10_df_Genus, names(trans_D10_df_Genus)), rowMeans))
+D40_Genus_mean = as.data.frame(sapply(split.default(trans_D40_df_Genus, names(trans_D40_df_Genus)), rowMeans))
+D100_Genus_mean = as.data.frame(sapply(split.default(trans_D100_df_Genus, names(trans_D100_df_Genus)), rowMeans))
+D200_Genus_mean = as.data.frame(sapply(split.default(trans_D200_df_Genus, names(trans_D200_df_Genus)), rowMeans))
+D360_Genus_mean = as.data.frame(sapply(split.default(trans_D360_df_Genus, names(trans_D360_df_Genus)), rowMeans))
+
+
+#Bind into one df
+ForBray_Genus_df_num = rbind(D0_Genus_mean,
+                             D10_Genus_mean,
+                             D40_Genus_mean,
+                             D100_Genus_mean,
+                             D200_Genus_mean,
+                             D360_Genus_mean)
+
+
+#Remove excess rows
+ForBray_Genus_df_num = ForBray_Genus_df_num[-c(2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32,34,36,38,40),]
+
+ForBray_Genus_df = ForBray_Genus_df_num
+
+#Add sample depth as a column
+ForBray_Genus_df$Sample_Depth = c(0,10,40,100,200,360)
+
+rownames(ForBray_Genus_df) = c(0,10,40,100,200,360)
+rownames(ForBray_Genus_df_num) = c(0,10,40,100,200,360)
+
+#Save for recordkeeping and later use
+write.csv(ForBray_Genus_df, "All_micro_Vert_16S")
+
+
+```
+```{r Carry out mantel test for vertical Long Sound community}
+
+#Make distance matrix:
+Allmicrobes_mantel.dist = dist(cbind(ForBray_Genus_df[,c(1:947)]))
+
+#Make distance objects
+Mantel_CTD = dist(cbind(Vert_CTD$Temperature,
+                  Vert_CTD$OxygenPerSat,
+                  Vert_CTD$Salinity))
+Depth.dist = dist(Vert_CTD$Sample_Depth)
+Temperature.dist = dist(Vert_CTD$Temperature)
+Salinity.dist = dist(Vert_CTD$Salinity)
+OxygenPerSat.dist = dist(Vert_CTD$OxygenPerSat)
+
+#Run mantel test (using mantel() from the vegan library)
+mantel(Depth.dist,
+       Allmicrobes_mantel.dist)
+mantel(Mantel_CTD,
+       Ecolog_bray)
+mantel(Mantel_CTD,
+       Allmicrobes_mantel.dist)
+mantel(Temperature.dist,
+       Allmicrobes_mantel.dist)
+mantel(Salinity.dist,
+       Allmicrobes_mantel.dist)
+mantel(OxygenPerSat.dist,
+       Allmicrobes_mantel.dist)
+
+
+```
+#Horizontal community Anosim tests
+```{r Horizontal community Anosim test}
+Depth_group = get_variable(Fiord_phyloseq_Vert@sam_data, "Sample_Depth")
+Depth_ano = anosim(phyloseq::distance(Fiord_phyloseq_Vert, "bray"), Depth_group, permutations = 9999)
+Depth_ano$signif
+Depth_ano$statistic
+
+
+```
+#Horizontal community Adonis tests
+```{r Horizontal community Adonis test}
+Depth_group = get_variable(Fiord_phyloseq_Vert@sam_data, "Sample_Depth")
+df_prof = as(sample_data(Fiord_phyloseq_Vert), "data.frame")
+df_prof.dist = phyloseq::distance(Fiord_phyloseq_Vert, "bray")
+Depth_ado = adonis(df_prof.dist ~ Depth_group)
+
+Depth_ado
+
+
+```
+#Vertical community physicochemical parameter regression
+```{r CTD regression}
+#Import dataframe
+Vertical_CTD = read.csv("Vert_PP.csv", row.names = 1)
+
+Vert_CTD = Vertical_CTD[-c(1:8, 15:20),]
+
+#Add sample Depth to df
+Vert_CTD$Sample_Depth = as.numeric(c(0, 10, 40, 100, 200, 360))
+
+par(mar = c(5,5,2,5)) #Define plot margins
+with(plot(Vert_CTD$Sample_Depth, #X-axis 
+          Vert_CTD$Temperature, #Y-axis
+     col = "red",  #Colour
+     type = "l", #Plot type
+     xlab = "Sample Depth (m)", #X-axis label
+     ylab = "Temperature (˚C) and Oxygen Saturation (%)",
+     ylim = c(5,14))) #Y-axis label
+
+par(new = T)
+with(plot(Vert_CTD$Sample_Depth, #X-axis
+          Vert_CTD$Salinity, #Y-axis
+          col = "blue", #Make the line blue
+          type = "l", #Make it a line graph
+          xlab = NA, #Exclude the x axis label
+          ylab = NA, #Exclude the y axis label
+          axes = F, #Exclude the axes for this one
+          cex = 1)) #Normal size of plots
+
+axis(side = 4) #Make the second axis on the right
+
+mtext(side = 4,line = 2.75, "Salinity (ppt)") #Define the second axis label.
+
+par(new = T)
+with(plot(Vert_CTD$Sample_Depth, #X-axis
+          Vert_CTD$OxygenPerSat, #Y-axis
+          col = "green", #Make the line green
+          type = "l", #Make it a line graph
+          xlab = NA, #Exclude the x axis label
+          ylab = NA, #Exclude the y axis label
+          axes = F, #Exclude the axes for this one
+          cex = 1,
+          ylim = c(5,13))) #Normal size of plots
+
+
+
+legend("bottomright",
+       legend = c("Temperature", "Salinity", "Oxygen"),
+       lty = c(1,0), 
+       pch = c(NA,16), 
+       col = c("red", "blue", "green"),
+       cex = 0.75)
+
+CTD_regression = recordPlot()
+```
+```{r Export vertical regression for ggarrange}
+saveRDS(CTD_regression,"~/Desktop/To_ggarrange/Profile_CTD_regression.rds")
+```
+
+
+
+
+
