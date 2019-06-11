@@ -25,9 +25,9 @@ library(Rmisc)
 ##Import files:
 ```{r Set path}
 
-uzdir <- "/Users/sven/Desktop/Project_R_analysis/"
-otutable_biom_file <- paste("/Users/sven/Desktop/Project_R_analysis/", "Merged_otu_table_json.biom", sep = "")
-map_file <- paste("/Users/sven/Desktop/Project_R_analysis/Sorted_out/", "Modified_mapping_file_mod_with_names_and_variables.txt", sep = "")
+uzdir <- "My/Path/"
+otutable_biom_file <- paste("~Required Files/", "Merged_otu_table_json.biom", sep = "")
+map_file <- paste("~/Required Files/", "Modified_mapping_file_mod_with_names_and_variables.txt", sep = "")
 
 
 ```
@@ -227,7 +227,7 @@ Observed_Richness_in_out_D <- ggplot(alpha_meta_in_out, aes(x=Sample_Site, y=Obs
 
 ```
 ```{r Export consensus fjords for later ggarrange}
-saveRDS(Observed_Richness_in_out_D,"~/Desktop/Multifjord_alphaDiv_16S.rds")
+saveRDS(Observed_Richness_in_out_D,"~/Multifjord_alphaDiv_16S.rds")
 ```
 #Five fjords Kruskal-Wallis (KW) tests
 ```{r Carry out consensus KW tests}
@@ -312,7 +312,7 @@ Observed_Richness_Hor_D_distance <- ggplot(observedrichness_distancefrom_L1, aes
 
 ```
 ```{r Export Horizontal community for later ggarrange}
-saveRDS(Observed_Richness_Hor_D_distance,"~/Desktop/Transect_alphadiv_16S_Observed.rds")
+saveRDS(Observed_Richness_Hor_D_distance,"~/Transect_alphadiv_16S_Observed.rds")
 ```
 #Horizontal community Kruskal-Wallis (KW) tests
 ```{r Carry out horizontal community KW tests}
@@ -392,7 +392,7 @@ Observed_Richness_Vert_D <- ggplot(alpha_meta_Vert,
 Observed_Richness_Vert_D
 ```
 ```{r Export Vertical community for later ggarrange}
-saveRDS(Observed_Richness_Vert_D,"~/Desktop/Profile_alphadiv_16S_Observed.rds")
+saveRDS(Observed_Richness_Vert_D,"~/Profile_alphadiv_16S_Observed.rds")
 ```
 #Vertical community Kruskal-Wallis (KW) tests
 ```{r Carry out vertical community KW tests}

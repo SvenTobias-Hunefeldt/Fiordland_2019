@@ -25,11 +25,9 @@ library(pspearman)
 ##Import files:
 ```{r Import files}
 
-uzdir <- "/Users/sven/Desktop/18S/RStudio_analysis/"
-
-otutable_biom_file <- paste("/Users/sven/Desktop/18S/Rarified_otu_tables_6600/", "Merged_otu_table_6600.json", sep = "")
-
-map_file <- paste("/Users/sven/Desktop/18S/", "18S_2017_map_test.txt", sep = "")
+uzdir <- "My/Path"
+otutable_biom_file <- paste("~/Required Files/", "Merged_otu_table_6600.json", sep = "")
+map_file <- paste("~/Required Files/", "Modified_mapping_file_18S.csv", sep = "")
 
 
 ```
@@ -242,7 +240,7 @@ dev.off()
 
 ```
 ```{r Export Horizontal community for later ggarrange}
-saveRDS(Observed_Richness_Hor_D,"~/Desktop/Transect_alphadiv_18S.rds")
+saveRDS(Observed_Richness_Hor_D,"~/Transect_alphadiv_18S.rds")
 ```
 #Horizontal community Kruskal-Wallis (KW) tests
 ```{r Carry out horizontal community KW tests}
@@ -316,7 +314,7 @@ dev.off()
 
 ```
 ```{r Export Vertical community for later ggarrange}
-saveRDS(Observed_Richness_Vert_D,"~/Desktop/Profile_alphadiv_18S.rds")
+saveRDS(Observed_Richness_Vert_D,"~/Profile_alphadiv_18S.rds")
 ```
 #Vertical community Kruskal-Wallis (KW) tests
 ```{r Carry out vertical community KW tests}

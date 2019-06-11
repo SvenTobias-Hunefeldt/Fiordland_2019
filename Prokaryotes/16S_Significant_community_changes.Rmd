@@ -23,9 +23,9 @@ library(plyr)
 ##Import files:
 ```{r Set path}
 
-uzdir <- "/Users/sven/Desktop/Project_R_analysis/"
-otutable_biom_file <- paste("/Users/sven/Desktop/Project_R_analysis/", "Merged_otu_table_json.biom", sep = "")
-map_file <- paste("/Users/sven/Desktop/Project_R_analysis/Sorted_out/", "Modified_mapping_file_mod_with_names_and_variables.txt", sep = "")
+uzdir <- "My/Path/"
+otutable_biom_file <- paste("~/Required Files", "Merged_otu_table_json.biom", sep = "")
+map_file <- paste("~Required Files/", "Modified_mapping_file_mod_with_names_and_variables.txt", sep = "")
 
 
 ```
@@ -494,7 +494,7 @@ summary(as.factor(plotsign.vs.nonSign$Genus))
 ```
 ##Export for ggarrange
 ```{r Export consensus}
-saveRDS(Summary_all_plot,"~/Desktop/Phylum_EdgeR_Consensus_16S.rds")
+saveRDS(Summary_all_plot,"~/Phylum_EdgeR_Consensus_16S.rds")
 
 ```
 #Signficantly changing horizontal community
@@ -669,7 +669,7 @@ summary(as.factor(plotsign.vs.nonSign_Transect_Dist$Genus))
 
 #Add distance to phyloseq object
 ##Read in .csv file
-CTDtoadd = read.csv("/Users/sven/Desktop/Hor_CTDtoAdd.csv", row.names = 1)
+CTDtoadd = read.csv("~/Required Files/Hor_CTDtoAdd.csv", row.names = 1)
 
 Arranged_CTD = plyr::arrange(CTDtoadd, SampleID)
 Arranged_CTD$Salinity
@@ -1127,10 +1127,10 @@ summary(as.factor(plotsign.vs.nonSign_Transect_Ox$Genus))
 ```
 ##Export for ggarrange
 ```{r Export horizontal}
-saveRDS(Summary_plot_Transect_Dist,"~/Desktop/Phylum_EdgeR_Transect_16S_Dist.rds")
-saveRDS(Summary_plot_Transect_Sal,"~/Desktop/Phylum_EdgeR_Transect_16S_Sal.rds")
-saveRDS(Summary_plot_Transect_Temp,"~/Desktop/Phylum_EdgeR_Transect_16S_Temp.rds")
-saveRDS(Summary_plot_Transect_Ox,"~/Desktop/Phylum_EdgeR_Transect_16S_Ox.rds")
+saveRDS(Summary_plot_Transect_Dist,"~/Phylum_EdgeR_Transect_16S_Dist.rds")
+saveRDS(Summary_plot_Transect_Sal,"~/Phylum_EdgeR_Transect_16S_Sal.rds")
+saveRDS(Summary_plot_Transect_Temp,"~/Phylum_EdgeR_Transect_16S_Temp.rds")
+saveRDS(Summary_plot_Transect_Ox,"~/Phylum_EdgeR_Transect_16S_Ox.rds")
 ```
 #Signficantly changing vertical community
 ##Correlated with depth
@@ -1768,8 +1768,8 @@ summary(as.factor(plotsign.vs.nonSign_Ox$Genus))
 ```
 ##Export for ggarrange
 ```{r Export vertical}
-saveRDS(Summary_plot,"~/Desktop/Fjordpaper/3_Results/11_To_ggarrange/Phylum_EdgeR_Profile_16S_Depth.rds")
-saveRDS(Summary_plot_Ox,"~/Desktop/Fjordpaper/3_Results/11_To_ggarrange/Phylum_EdgeR_Profile_16S_Ox.rds")
-saveRDS(Summary_plot_Sal,"~/Desktop/Fjordpaper/3_Results/11_To_ggarrange/Phylum_EdgeR_Profile_16S_Sal.rds")
-saveRDS(Summary_plot_Temp,"~/Desktop/Fjordpaper/3_Results/11_To_ggarrange/Phylum_EdgeR_Profile_16S_Temp.rds")
+saveRDS(Summary_plot,"~/Phylum_EdgeR_Profile_16S_Depth.rds")
+saveRDS(Summary_plot_Ox,"~/Phylum_EdgeR_Profile_16S_Ox.rds")
+saveRDS(Summary_plot_Sal,"~/Phylum_EdgeR_Profile_16S_Sal.rds")
+saveRDS(Summary_plot_Temp,"~/Phylum_EdgeR_Profile_16S_Temp.rds")
 ```

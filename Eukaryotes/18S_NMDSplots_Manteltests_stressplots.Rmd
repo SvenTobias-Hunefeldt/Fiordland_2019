@@ -24,15 +24,15 @@ library(microbiome)
 ##Import files:
 ```{r Set path}
 
-uzdir <- "/Users/sven/Desktop/Project_R_analysis/"
-otutable_biom_file <- paste("/Users/sven/Desktop/Project_R_analysis/", "Merged_otu_table_json.biom", sep = "")
-map_file <- paste("/Users/sven/Desktop/Project_R_analysis/Sorted_out/", "Modified_mapping_file_mod_with_names_and_variables.txt", sep = "")
+uzdir <- "My/Path"
+otutable_biom_file <- paste("~/Required Files/", "Merged_otu_table_6600.json", sep = "")
+map_file <- paste("~/Required Files/", "Modified_mapping_file_18S copy.txt", sep = "")
 
 
 ```
 ```{r Create phyloseq object}
-# Now import the .biom-formatted otu_table-tax_table file.
 
+# Now import the .biom-formatted otu_table-tax_table file.
 biom_otu_tax <- import_biom(otutable_biom_file)
 
 # Add sample data to the dataset using merge
@@ -42,7 +42,6 @@ dim(bmsd)
 sample_data(bmsd)
 sample_variables(bmsd)
 biom_otu_tax
-
 
 #Merge into phyloseq format
 Fiord_phyloseq <- merge_phyloseq(biom_otu_tax, bmsd)
@@ -127,17 +126,11 @@ tax_table(Fiord_phyloseq) =gsub("D_5__", "", tax_table(Fiord_phyloseq))
 tax_table(Fiord_phyloseq) =gsub("D_6__", "", tax_table(Fiord_phyloseq))
 
 ```
-
-##Modify files
-```{r Add physicochemical parameters to mapping file}
-
-Modified_mapping_file = read.csv("~/Desktop/Modified_mapping_file_18S.csv", row.names = 1)
-
-sample_data(Fiord_phyloseq) = Modified_mapping_file
-
-```
-##Subset phyloseq objects
 ```{r Subset}
+Biolog_phyloseq = Fiord_phyloseq
+
+Biolog_phyloseq@otu_table@.Data = t(as.matrix(Biolog_Metadat_Num[c(2:4,10:44,49,50)]))
+
 #Subset to in/out
 Fiord_phyloseq_in_out = subset_samples(Fiord_phyloseq, !Sample_type == "Transverse")
 
@@ -147,6 +140,36 @@ Fiord_phyloseq_Horonly = subset_samples(Fiord_phyloseq, Sample_type == "Transver
 #Subset vertical community
 Fiord_phyloseq_Vert = subset_samples(Fiord_phyloseq, !Sample_type == "in" & !Sample_type == "out")
 Fiord_phyloseq_Vert = subset_samples(Fiord_phyloseq_Vert, Sample_Site == "L5")
+```
+```{r Add detail to phyloseq objects}
+
+#Add distance to phyloseq object
+Fiord_phyloseq_Horonly@sam_data[["Distance_from_L1"]][grep("L1", Fiord_phyloseq_Horonly@sam_data[["Sample_Site"]])] = 0
+Fiord_phyloseq_Horonly@sam_data[["Distance_from_L1"]][grep("L2", Fiord_phyloseq_Horonly@sam_data[["Sample_Site"]])] = as.numeric(5.59)
+Fiord_phyloseq_Horonly@sam_data[["Distance_from_L1"]][grep("L3", Fiord_phyloseq_Horonly@sam_data[["Sample_Site"]])] = as.numeric(14.3)
+Fiord_phyloseq_Horonly@sam_data[["Distance_from_L1"]][grep("L4", Fiord_phyloseq_Horonly@sam_data[["Sample_Site"]])] = as.numeric(10.67)
+Fiord_phyloseq_Horonly@sam_data[["Distance_from_L1"]][grep("L5", Fiord_phyloseq_Horonly@sam_data[["Sample_Site"]])] = as.numeric(8.47)
+Fiord_phyloseq_Horonly@sam_data[["Distance_from_L1"]][grep("L6", Fiord_phyloseq_Horonly@sam_data[["Sample_Site"]])] = as.numeric(4.73)
+Fiord_phyloseq_Horonly@sam_data[["Distance_from_L1"]][grep("L7", Fiord_phyloseq_Horonly@sam_data[["Sample_Site"]])] = as.numeric(3.16)
+Fiord_phyloseq_Horonly@sam_data[["Distance_from_L1"]][grep("L8", Fiord_phyloseq_Horonly@sam_data[["Sample_Site"]])] = as.numeric(2.47)
+
+```
+##Modify files
+```{r Add physicochemical parameters to mapping file}
+
+Modified_mapping_file = read.csv("~/Required Files/Modified_mapping_file_18S.csv", row.names = 1)
+
+sample_data(Fiord_phyloseq) = Modified_mapping_file
+
+```
+##Subset phyloseq objects
+```{r Subset}
+
+#Subset horizontal community
+Fiord_phyloseq_Horonly = subset_samples(Fiord_phyloseq, !Depth_m == "40" & !Depth_m == "100" & !Depth_m == "200" & !Depth_m == "360")
+
+#Subset vertical community
+Fiord_phyloseq_Vert = subset_samples(Fiord_phyloseq, Layer == "5")
 ```
 ##Phylum colour list for consistency
 ```{r Phylum colour list}
@@ -212,8 +235,8 @@ dev.off()
 NMDS.ord_transect_Euk
 ```
 ```{r Export horizontal fjord for later ggarrange}
-saveRDS(sampleplot_transect_Euk,"~/Desktop/Transect_betadiv_18S.rds")
-saveRDS(NMDS.ord_transect_Euk,"~/Desktop/18S_transect_stressplot.rds")
+saveRDS(sampleplot_transect_Euk,"~/Transect_betadiv_18S.rds")
+saveRDS(NMDS.ord_transect_Euk,"~/18S_transect_stressplot.rds")
 ```
 #Horizontal community Mantel tests
 ```{r Set up for horizontal Long Sound community}
@@ -285,6 +308,7 @@ NMDS.ord_profile_Euk
 
 sample_data(Fiord_phyloseq_profile_Euk)$Depth_m<-as.factor(sample_data(Fiord_phyloseq_profile_Euk)$Depth_m)
 
+Depth_colour_list = c("0" = "red", "10" = "blue", "40" = "grey", "100" = "green", "200" = "black", "360" = "magenta")
 
 sampleplot_profile_Euk = plot_ordination(Fiord_phyloseq_profile_Euk, NMDS.ord_profile_Euk, color = "Depth_m") +
   scale_colour_manual("Sample Depth", values = Depth_colour_list) +
@@ -293,7 +317,7 @@ sampleplot_profile_Euk = plot_ordination(Fiord_phyloseq_profile_Euk, NMDS.ord_pr
 
 sampleplot_profile_Euk
 
-dev.copy(png,"Beta Diversity profile Eukonly", units = "in", width = 6, height = 5, res = 500)
+dev.copy(png,"~/Beta Diversity profile Eukonly", units = "in", width = 4, height = 2, res = 500)
 dev.off()
 
 stressplot(NMDS.ord_profile_Euk)
@@ -303,8 +327,8 @@ NMDS.ord_profile_Euk
 
 ```
 ```{r Export vertical plots for later ggarrange}
-saveRDS(sampleplot_profile_Euk,"~/Desktop/Profile_betadiv_18S.rds")
-saveRDS(NMDS.ord_profile_Euk,"~/Desktop/18S_profile_stressplot.rds")
+saveRDS(sampleplot_profile_Euk,"~/Profile_betadiv_18S.rds")
+saveRDS(NMDS.ord_profile_Euk,"~/18S_profile_stressplot.rds")
 ```
 #Vertical community Mantel tests
 ```{r Set up for vertical Long Sound community}

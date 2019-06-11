@@ -21,9 +21,10 @@ library(dplyr)
 ##Import files:
 ```{r Set path}
 
-uzdir <- "/Users/sven/Desktop/Project_R_analysis/"
-otutable_biom_file <- paste("/Users/sven/Desktop/Project_R_analysis/", "Merged_otu_table_json.biom", sep = "")
-map_file <- paste("/Users/sven/Desktop/Project_R_analysis/Sorted_out/", "Modified_mapping_file_mod_with_names_and_variables.txt", sep = "")
+uzdir <- "My/Path"
+otutable_biom_file <- paste("~/Required Files/", "Merged_otu_table_json.biom", sep = "")
+
+map_file <- paste("~/Required Files/", "Modified_mapping_file_mod_with_names_and_variables.txt", sep = "")
 
 
 ```
@@ -207,8 +208,8 @@ NMDS.ord_inout
 ```
 ```{r Export consensus fjord for later ggarrange}
 
-saveRDS(NMDS_Multi,"~/Desktop/To_ggarrange/Multifjord_betadiv_16S.rds")
-saveRDS(NMDS.ord_inout,"~/Desktop/16S_Multi_stressplot.rds")
+saveRDS(NMDS_Multi,"~/Multifjord_betadiv_16S.rds")
+saveRDS(NMDS.ord_inout,"~/16S_Multi_stressplot.rds")
 ```
 #Five fjords Mantel tests
 ```{r Set up}
@@ -466,8 +467,8 @@ stressplot(NMDS.ord_Hor)
 NMDS.ord_Hor
 ```
 ```{r Export horizontal fjord for later ggarrange}
-saveRDS(NMDS_Hor,"~/Desktop/To_ggarrange/Transect_betadiv_16S.rds")
-saveRDS(NMDS.ord_Hor,"~/Desktop/16S_Transect_stressplot.rds")
+saveRDS(NMDS_Hor,"~/To_ggarrange/Transect_betadiv_16S.rds")
+saveRDS(NMDS.ord_Hor,"~/16S_Transect_stressplot.rds")
 ```
 #Horizontal community Mantel tests
 ```{r Set up for horizontal Long Sound community}
@@ -765,8 +766,8 @@ D10_CTD_regression = recordPlot()
 
 ```
 ```{r Export horizontal regressions for ggarrange}
-saveRDS(Surface_CTD_regression,"~/Desktop/To_ggarrange/surface_CTD_regression.rds")
-saveRDS(D10_CTD_regression,"~/Desktop/Fjordpaper/3_Results/11_To_ggarrange/10m_CTD_regression.rds")
+saveRDS(Surface_CTD_regression,"~/surface_CTD_regression.rds")
+saveRDS(D10_CTD_regression,"~/10m_CTD_regression.rds")
 
 ```
 #Vertical NMDS plot
@@ -790,8 +791,8 @@ stressplot(NMDS.ord_Vert)
 
 ```
 ```{r Export vertical plots for later ggarrange}
-saveRDS(sampleplot,"~/Desktop/To_ggarrange/Profile_betadiv_16S.rds")
-saveRDS(NMDS.ord_Vert,"~/Desktop/16S_Profile_stressplot.rds")
+saveRDS(sampleplot,"~/Profile_betadiv_16S.rds")
+saveRDS(NMDS.ord_Vert,"~/16S_Profile_stressplot.rds")
 ```
 #Vertical community Mantel tests
 ```{r Set up for vertical Long Sound community}
@@ -980,7 +981,7 @@ legend("bottomright",
 CTD_regression = recordPlot()
 ```
 ```{r Export vertical regression for ggarrange}
-saveRDS(CTD_regression,"~/Desktop/To_ggarrange/Profile_CTD_regression.rds")
+saveRDS(CTD_regression,"~/Profile_CTD_regression.rds")
 ```
 
 

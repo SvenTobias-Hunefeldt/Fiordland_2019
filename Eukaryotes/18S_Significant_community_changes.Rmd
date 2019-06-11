@@ -23,9 +23,9 @@ library(scales)
 ##Import files:
 ```{r Set path}
 
-uzdir <- "/Users/sven/Desktop/Project_R_analysis/"
-otutable_biom_file <- paste("/Users/sven/Desktop/Project_R_analysis/", "Merged_otu_table_json.biom", sep = "")
-map_file <- paste("/Users/sven/Desktop/Project_R_analysis/Sorted_out/", "Modified_mapping_file_mod_with_names_and_variables.txt", sep = "")
+uzdir <- "My/Path"
+otutable_biom_file <- paste("~/Required Files/", "Merged_otu_table_6600.json", sep = "")
+map_file <- paste("~/Fjordpaper/R/Required Files/", "Modified_mapping_file_18S.txt", sep = "")
 
 
 ```
@@ -130,22 +130,18 @@ tax_table(Fiord_phyloseq) =gsub("D_6__", "", tax_table(Fiord_phyloseq))
 ##Modify files
 ```{r Add physicochemical parameters to mapping file}
 
-Modified_mapping_file = read.csv("~/Desktop/Modified_mapping_file_18S.csv", row.names = 1)
+Modified_mapping_file = read.csv("~Modified_mapping_file_18S.csv", row.names = 1)
 
 sample_data(Fiord_phyloseq) = Modified_mapping_file
 
 ```
 ##Subset phyloseq objects
 ```{r Subset}
-#Subset to in/out
-Fiord_phyloseq_in_out = subset_samples(Fiord_phyloseq, !Sample_type == "Transverse")
-
 #Subset horizontal community
-Fiord_phyloseq_Horonly = subset_samples(Fiord_phyloseq, Sample_type == "Transverse" & !Sample_Depth == "40" & !Sample_Depth == "100" & !Sample_Depth == "200" & !Sample_Depth == "360")
+Fiord_phyloseq_Horonly = subset_samples(Fiord_phyloseq, !Depth_m == "40" & !Depth_m == "100" & !Depth_m == "200" & !Depth_m == "360")
 
 #Subset vertical community
-Fiord_phyloseq_Vert = subset_samples(Fiord_phyloseq, !Sample_type == "in" & !Sample_type == "out")
-Fiord_phyloseq_Vert = subset_samples(Fiord_phyloseq_Vert, Sample_Site == "L5")
+Fiord_phyloseq_Vert = subset_samples(Fiord_phyloseq, Layer == "5")
 ```
 ##Phylum colour list for consistency
 ```{r Phylum colour list}
@@ -335,8 +331,8 @@ Plot_location_Phyla = ggplot(my_phylum_phyloseq,
 
 ```
 ```{r Export rough plots}
-saveRDS(Plot_location_Domain, "~/Desktop/Domainprofile18S.rds")
-saveRDS(Plot_location_Phyla, "~/Desktop/Phylaprofile18S.rds")
+saveRDS(Plot_location_Domain, "~/Domainprofile18S.rds")
+saveRDS(Plot_location_Phyla, "~/Phylaprofile18S.rds")
 
 ```
 #Signficantly changing horizontal community
@@ -569,8 +565,8 @@ summary(as.factor(plotsign.vs.nonSign_Transect_Sal$Genus))
 ```
 ##Export for ggarrange
 ```{r Export horizontal}
-saveRDS(Summary_plot_Transect_Phylum_Euk,"~/Desktop/Phylum_EdgeR_Transect_18S.rds")
-saveRDS(Summary_plot_Transect_Phylum_Sal,"~/Desktop/Phylum_EdgeR_Profile_Sal_18S.rds")
+saveRDS(Summary_plot_Transect_Phylum_Euk,"~/Phylum_EdgeR_Transect_18S.rds")
+saveRDS(Summary_plot_Transect_Phylum_Sal,"~/Phylum_EdgeR_Profile_Sal_18S.rds")
 
 
 ```
@@ -802,8 +798,8 @@ summary(as.factor(plotsign.vs.nonSign_Profile$Genus))
 
 ##Export for ggarrange
 ```{r Export vertical}
-saveRDS(Summary_plot_Profile_Phylum_Euk,"~/Desktop/Phylum_EdgeR_Profile_18S.rds")
-saveRDS(Summary_plot_Profile_Phylum_Sal_Mod,"~/Desktop/Phylum_EdgeR_Profile_Sal_18S.rds")
+saveRDS(Summary_plot_Profile_Phylum_Euk,"~/Phylum_EdgeR_Profile_18S.rds")
+saveRDS(Summary_plot_Profile_Phylum_Sal_Mod,"~/Phylum_EdgeR_Profile_Sal_18S.rds")
 ```
 
 

@@ -147,7 +147,7 @@ Depth_colour_list = c("0" = "red", "10" = "blue", "40" = "grey", "100" = "green"
 
 Profile_betadiv_18S.rds = Profile_betadiv_18S.rds + 
   scale_color_manual("Sample Depth (m)", values = Depth_colour_list)
-
+library(ggplot2)
 pdf("LongSound_Beta_Diversity_test.pdf", width = 8, height = 6)
 ggarrange(Transect_betadiv_16S.rds, 
           Transect_betadiv_18S.rds,
