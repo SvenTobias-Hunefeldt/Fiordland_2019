@@ -1,0 +1,789 @@
+---
+title: "Graphical_Abstract_gitHub"
+author: "Sven"
+date: "7/21/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+library(dplyr) - version 0.8.1
+library(scales) - version 1.0.0
+library(phyloseq) - version 1.26.1
+library(ggplot2) - version 3.1.1
+library(Rmisc) - version 1.5
+##Phylum colour list for consistency
+```{r Phylum colour list}
+Phylum_colour_list = c(
+#Prokaryotes
+  Acidobacteria = "#FF6600",
+  Actinobacteria = "#FF00FF",
+  Bacteroidetes = "#00AAD4",
+  Chloroflexi = "#0066FF",
+  Euryarchaeota = "#6600FF",
+  Gemmatimonadetes = "#FE0066",
+  "Marinimicrobia (SAR406 clade)" = "#BC5FD3",
+  Planctomycetes = "#AA8800",
+  Proteobacteria = "#FF0000",
+  Thaumarchaeota = "#8A6F91",
+  Verrucomicrobia = "#FFCC00",
+  Cyanobacteria = "#330088",
+#Eukaryotes  
+  Archaeplastida = "#008000",
+  Excavata = "#00D400",
+  Opisthokonta = "#66FF00",
+  SAR = "#2d5016ff"
+)
+```
+#Set up - 16S
+library(phyloseq)
+```{r Import files}
+####Initial env. loading####
+setwd("~/My/Path/")
+Biolog_Metadat_Num_16S = read.csv("~/My/Path/Biolog_Metadata_Num.csv")
+rownames(Biolog_Metadat_Num_16S) = Biolog_Metadat_Num_16S$X
+Biolog_Metadat_Num_16S = subset.data.frame(Biolog_Metadat_Num_16S, select = -1)
+
+map_file_16S <- paste("/My/Path/Biolog_Metadata_Num.csv", sep = ",")
+
+bmsd_16S <- import_qiime_sample_data(map_file_16S)
+
+#16S
+otutable_biom_file_16S <- paste("/My/Path/", "Merged_otu_table_json.biom", sep = "")
+
+Fiord_phyloseq_16S <- import_biom(otutable_biom_file_16S)
+sample_data(Fiord_phyloseq_16S) <- Biolog_Metadat_Num_16S
+
+#Fix Misslabel
+Fiord_phyloseq_16S@sam_data$Sample_Depth[Fiord_phyloseq_16S@sam_data$Sample_Depth == 1] = 0
+
+```
+##Create average result for multiple rarefaction by transforming data using (divide by 10) and check counts per sample
+```{r Create average result for multiple rarefaction by transforming data using (divide by 10), results='markup'}
+Fiord_phyloseq_16S = transform_sample_counts(Fiord_phyloseq_16S, function(x) x/10)
+sample_sums(Fiord_phyloseq_16S)
+```
+#### Round and confirm count number
+```{r Round and confirm count number, results='markup'}
+Fiord_phyloseq_16S = transform_sample_counts(Fiord_phyloseq_16S, round)
+sample_sums(Fiord_phyloseq_16S)
+Fiord_phyloseq_16S = prune_samples(sample_sums(Fiord_phyloseq_16S)>=1, Fiord_phyloseq_16S)
+sample_sums(Fiord_phyloseq_16S)
+```
+Check that all OTUs have representative counts  
+For here taxa = OTU  
+__Commands interpretation:__  
+_Total number of taxa in dataset:_ sum(taxa_sums(Fiord_phyloseq) > 0)   
+
+_Any taxa with no hits:_ any(taxa_sums(Fiord_phyloseq)== 0)
+```{r identify taxa with only zeros, results='markup', echo=TRUE}
+sum(taxa_sums(Fiord_phyloseq_16S) > 0)
+any(taxa_sums(Fiord_phyloseq_16S)== 0)
+sum(taxa_sums(Fiord_phyloseq_16S) == 0)
+any(taxa_sums(Fiord_phyloseq_16S) > 1)
+sum(taxa_sums(Fiord_phyloseq_16S) > 1)
+any(taxa_sums(Fiord_phyloseq_16S) < 1)
+sum(taxa_sums(Fiord_phyloseq_16S) < 1)
+```
+####Prune taxa with less than 1 count and check taxa numbers again
+```{r  Save original file and create new file with only present (no zeroes) taxa, results='markup', echo=TRUE}
+
+#Create new file with only present (no zeroes) taxa
+
+Fiord_phyloseq_16S = prune_taxa(taxa_sums(Fiord_phyloseq_16S) > 1, Fiord_phyloseq_16S)
+any(sample_sums(Fiord_phyloseq_16S) == 0)
+any(sample_sums(Fiord_phyloseq_16S) > 0)
+sum(taxa_sums(Fiord_phyloseq_16S) > 0)
+any(sample_sums(Fiord_phyloseq_16S) < 1)
+sum(taxa_sums(Fiord_phyloseq_16S) < 1)
+```
+##Compare sequences per sample or OTU
+library(ggplot2)
+```{r Compare sequences per sample or OTU}
+readsumsdf = data.frame(nreads = sort(taxa_sums(Fiord_phyloseq_16S),TRUE), sorted = 1:ntaxa(Fiord_phyloseq_16S), type = "OTU")
+readsumsdf = rbind(readsumsdf,data.frame(nreads = sort(sample_sums(Fiord_phyloseq_16S),TRUE),sorted = 1:nsamples(Fiord_phyloseq_16S), type = "Samples"))
+
+title = "Total number of reads"
+
+p = ggplot(readsumsdf, aes(x = sorted, y = nreads)) +
+  geom_bar(stat = "identity")
+
+p + ggtitle(title) +
+  scale_y_log10() +
+  facet_wrap(~type, 1, scales = "free")
+```
+##Check Variables
+```{r What sample variables exist in the phyloseq data}
+sample_variables(Fiord_phyloseq_16S)
+```
+```{r Attached OTU ID}
+tax_table(Fiord_phyloseq_16S) <- cbind(tax_table(Fiord_phyloseq_16S), OTU=taxa_names(Fiord_phyloseq_16S))
+```
+##Rename Ranks
+```{r Rename Ranks}
+colnames(tax_table(Fiord_phyloseq_16S)) = c("Domain", "Phylum", "Class", "Order", "Family", "Genus", "Species", "OTU")
+tax_table(Fiord_phyloseq_16S) =gsub("D_0__", "", tax_table(Fiord_phyloseq_16S))
+tax_table(Fiord_phyloseq_16S) =gsub("D_1__", "", tax_table(Fiord_phyloseq_16S))
+tax_table(Fiord_phyloseq_16S) =gsub("D_2__", "", tax_table(Fiord_phyloseq_16S))
+tax_table(Fiord_phyloseq_16S) =gsub("D_3__", "", tax_table(Fiord_phyloseq_16S))
+tax_table(Fiord_phyloseq_16S) =gsub("D_4__", "", tax_table(Fiord_phyloseq_16S))
+tax_table(Fiord_phyloseq_16S) =gsub("D_5__", "", tax_table(Fiord_phyloseq_16S))
+tax_table(Fiord_phyloseq_16S) =gsub("D_6__", "", tax_table(Fiord_phyloseq_16S))
+
+```
+```{r Subset}
+#Subset to in/out
+Fiord_phyloseq_16S_in_out = subset_samples(Fiord_phyloseq_16S, !Sample_type == "Transverse")
+
+#Subset horizontal community
+Fiord_phyloseq_16S_Horonly = subset_samples(Fiord_phyloseq_16S, Sample_type == "Transverse" & !Sample_Depth == "40" & !Sample_Depth == "100" & !Sample_Depth == "200" & !Sample_Depth == "360")
+
+#Subset vertical community
+Fiord_phyloseq_16S_Vert = subset_samples(Fiord_phyloseq_16S, !Sample_type == "in" & !Sample_type == "out")
+Fiord_phyloseq_16S_Vert = subset_samples(Fiord_phyloseq_16S_Vert, Sample_Site == "L5")
+```
+```{r Add detail to phyloseq objects}
+
+#Add distance to phyloseq_16S object
+Fiord_phyloseq_16S_Horonly@sam_data[["Distance_from_L1"]][grep("L1", Fiord_phyloseq_16S_Horonly@sam_data[["Sample_Site"]])] = 0
+Fiord_phyloseq_16S_Horonly@sam_data[["Distance_from_L1"]][grep("L2", Fiord_phyloseq_16S_Horonly@sam_data[["Sample_Site"]])] = as.numeric(5.59)
+Fiord_phyloseq_16S_Horonly@sam_data[["Distance_from_L1"]][grep("L3", Fiord_phyloseq_16S_Horonly@sam_data[["Sample_Site"]])] = as.numeric(14.3)
+Fiord_phyloseq_16S_Horonly@sam_data[["Distance_from_L1"]][grep("L4", Fiord_phyloseq_16S_Horonly@sam_data[["Sample_Site"]])] = as.numeric(10.67)
+Fiord_phyloseq_16S_Horonly@sam_data[["Distance_from_L1"]][grep("L5", Fiord_phyloseq_16S_Horonly@sam_data[["Sample_Site"]])] = as.numeric(8.47)
+Fiord_phyloseq_16S_Horonly@sam_data[["Distance_from_L1"]][grep("L6", Fiord_phyloseq_16S_Horonly@sam_data[["Sample_Site"]])] = as.numeric(4.73)
+Fiord_phyloseq_16S_Horonly@sam_data[["Distance_from_L1"]][grep("L7", Fiord_phyloseq_16S_Horonly@sam_data[["Sample_Site"]])] = as.numeric(3.16)
+Fiord_phyloseq_16S_Horonly@sam_data[["Distance_from_L1"]][grep("L8", Fiord_phyloseq_16S_Horonly@sam_data[["Sample_Site"]])] = as.numeric(2.47)
+
+```
+
+#Set up - 18S
+library(phyloseq)
+```{r Import files}
+####Initial env. loading####
+Biolog_Metadat_Num_18S = read.csv("~/My/Path/18S_2017_map_test.csv")
+row.names(Biolog_Metadat_Num_18S) = Biolog_Metadat_Num_18S$SampleID
+
+Biolog_Metadat_Num_18S = subset.data.frame(Biolog_Metadat_Num_18S, select = -1)
+
+map_file_18S = paste("/My/Path/18S_2017_map_test.txt")
+
+bmsd_18S <- import_qiime_sample_data(map_file_18S)
+
+
+otutable_biom_file_18S <- paste("/My/Path/", "Merged_otu_table_6600.json", sep = "")
+
+#18S
+Fiord_phyloseq_18S <- import_biom(otutable_biom_file_18S)
+sample_data(Fiord_phyloseq_18S) <- Biolog_Metadat_Num_18S
+
+#Fix Misslabel
+#18S
+Fiord_phyloseq_18S@sam_data$Depth_m[Fiord_phyloseq_18S@sam_data$Depth_m == 1] = 0
+
+```
+##Create average result for multiple rarefaction by transforming data using (divide by 10) and check counts per sample
+```{r Create average result for multiple rarefaction by transforming data using (divide by 10), results='markup'}
+Fiord_phyloseq_18S = transform_sample_counts(Fiord_phyloseq_18S, function(x) x/10)
+sample_sums(Fiord_phyloseq_18S)
+```
+#### Round and confirm count number
+```{r Round and confirm count number, results='markup'}
+Fiord_phyloseq_18S = transform_sample_counts(Fiord_phyloseq_18S, round)
+sample_sums(Fiord_phyloseq_18S)
+Fiord_phyloseq_18S = prune_samples(sample_sums(Fiord_phyloseq_18S)>=1, Fiord_phyloseq_18S)
+sample_sums(Fiord_phyloseq_18S)
+```
+Check that all OTUs have representative counts  
+For here taxa = OTU  
+__Commands interpretation:__  
+_Total number of taxa in dataset:_ sum(taxa_sums(Fiord_phyloseq) > 0)   
+
+_Any taxa with no hits:_ any(taxa_sums(Fiord_phyloseq)== 0)
+```{r identify taxa with only zeros, results='markup', echo=TRUE}
+sum(taxa_sums(Fiord_phyloseq_18S) > 0)
+any(taxa_sums(Fiord_phyloseq_18S)== 0)
+sum(taxa_sums(Fiord_phyloseq_18S) == 0)
+any(taxa_sums(Fiord_phyloseq_18S) > 1)
+sum(taxa_sums(Fiord_phyloseq_18S) > 1)
+any(taxa_sums(Fiord_phyloseq_18S) < 1)
+sum(taxa_sums(Fiord_phyloseq_18S) < 1)
+```
+####Prune taxa with less than 1 count and check taxa numbers again
+```{r  Save original file and create new file with only present (no zeroes) taxa, results='markup', echo=TRUE}
+
+#Create new file with only present (no zeroes) taxa
+
+Fiord_phyloseq_18S = prune_taxa(taxa_sums(Fiord_phyloseq_18S) > 1, Fiord_phyloseq_18S)
+any(sample_sums(Fiord_phyloseq_18S) == 0)
+any(sample_sums(Fiord_phyloseq_18S) > 0)
+sum(taxa_sums(Fiord_phyloseq_18S) > 0)
+any(sample_sums(Fiord_phyloseq_18S) < 1)
+sum(taxa_sums(Fiord_phyloseq_18S) < 1)
+```
+##Compare sequences per sample or OTU
+```{r Compare sequences per sample or OTU}
+readsumsdf = data.frame(nreads = sort(taxa_sums(Fiord_phyloseq_18S),TRUE), sorted = 1:ntaxa(Fiord_phyloseq_18S), type = "OTU")
+readsumsdf = rbind(readsumsdf,data.frame(nreads = sort(sample_sums(Fiord_phyloseq_18S),TRUE),sorted = 1:nsamples(Fiord_phyloseq_18S), type = "Samples"))
+
+title = "Total number of reads"
+
+p = ggplot(readsumsdf, aes(x = sorted, y = nreads)) +
+  geom_bar(stat = "identity")
+
+p + ggtitle(title) +
+  scale_y_log10() +
+  facet_wrap(~type, 1, scales = "free")
+```
+##Check Variables
+```{r What sample variables exist in the phyloseq data}
+sample_variables(Fiord_phyloseq_18S)
+```
+```{r Attached OTU ID}
+tax_table(Fiord_phyloseq_18S) <- cbind(tax_table(Fiord_phyloseq_18S), OTU=taxa_names(Fiord_phyloseq_18S))
+```
+##Rename Ranks
+```{r Rename Ranks}
+colnames(tax_table(Fiord_phyloseq_18S)) = c("Domain", "Phylum", "Class", "Order", "Family", "Genus", "Species", "OTU")
+tax_table(Fiord_phyloseq_18S) =gsub("D_0__", "", tax_table(Fiord_phyloseq_18S))
+tax_table(Fiord_phyloseq_18S) =gsub("D_1__", "", tax_table(Fiord_phyloseq_18S))
+tax_table(Fiord_phyloseq_18S) =gsub("D_2__", "", tax_table(Fiord_phyloseq_18S))
+tax_table(Fiord_phyloseq_18S) =gsub("D_3__", "", tax_table(Fiord_phyloseq_18S))
+tax_table(Fiord_phyloseq_18S) =gsub("D_4__", "", tax_table(Fiord_phyloseq_18S))
+tax_table(Fiord_phyloseq_18S) =gsub("D_5__", "", tax_table(Fiord_phyloseq_18S))
+tax_table(Fiord_phyloseq_18S) =gsub("D_6__", "", tax_table(Fiord_phyloseq_18S))
+
+```
+```{r Subset}
+
+#Only Eukaryota
+Fiord_phyloseq_18S = subset_taxa(Fiord_phyloseq_18S, Domain == "Eukaryota")
+
+#Subset horizontal community
+Fiord_phyloseq_18S_Horonly = subset_samples(Fiord_phyloseq_18S, !Depth_m == "40" & !Depth_m == "100" & !Depth_m == "200" & !Depth_m == "360")
+
+#Subset vertical community
+Fiord_phyloseq_18S_Vert = subset_samples(Fiord_phyloseq_18S, Layer == "5")
+```
+```{r Add detail to phyloseq objects}
+
+#Add distance to phyloseq_18S object
+Fiord_phyloseq_18S_Horonly@sam_data[["Distance_from_L1"]][grep("1", Fiord_phyloseq_18S_Horonly@sam_data[["Layer"]])] = 0
+Fiord_phyloseq_18S_Horonly@sam_data[["Distance_from_L1"]][grep("2", Fiord_phyloseq_18S_Horonly@sam_data[["Layer"]])] = as.numeric(5.59)
+Fiord_phyloseq_18S_Horonly@sam_data[["Distance_from_L1"]][grep("3", Fiord_phyloseq_18S_Horonly@sam_data[["Layer"]])] = as.numeric(14.3)
+Fiord_phyloseq_18S_Horonly@sam_data[["Distance_from_L1"]][grep("4", Fiord_phyloseq_18S_Horonly@sam_data[["Layer"]])] = as.numeric(10.67)
+Fiord_phyloseq_18S_Horonly@sam_data[["Distance_from_L1"]][grep("5", Fiord_phyloseq_18S_Horonly@sam_data[["Layer"]])] = as.numeric(8.47)
+Fiord_phyloseq_18S_Horonly@sam_data[["Distance_from_L1"]][grep("6", Fiord_phyloseq_18S_Horonly@sam_data[["Layer"]])] = as.numeric(4.73)
+Fiord_phyloseq_18S_Horonly@sam_data[["Distance_from_L1"]][grep("7", Fiord_phyloseq_18S_Horonly@sam_data[["Layer"]])] = as.numeric(3.16)
+Fiord_phyloseq_18S_Horonly@sam_data[["Distance_from_L1"]][grep("8", Fiord_phyloseq_18S_Horonly@sam_data[["Layer"]])] = as.numeric(2.47)
+
+Fiord_phyloseq_18S_Horonly@sam_data[["Distance_from_L1"]][grep("1", Fiord_phyloseq_18S_Horonly@sam_data[["Layer"]])] = 0
+Fiord_phyloseq_18S_Horonly@sam_data[["Distance_from_L1"]][grep("2", Fiord_phyloseq_18S_Horonly@sam_data[["Layer"]])] = as.numeric(5.59)
+
+```
+#Horizontal
+##Surface
+###0km
+```{r Community for 0 km surface}
+#Make combined object
+Fiord_phyloseq_Horonly = merge_phyloseq(Fiord_phyloseq_16S_Horonly, Fiord_phyloseq_18S_Horonly)
+
+#Subset samples
+Comm_0_0m = subset_samples(Fiord_phyloseq_Horonly, Distance_from_L1 == "0" & Sample_Depth == "0" | Distance_from_L1 == "0" & Depth_m == "0")
+
+Comm_0_0m_df = Comm_0_0m %>% #Identify the original subsetted phyloseq object
+  tax_glom("Phylum") %>% #Merge species with the same Domain.
+  transform_sample_counts(function(x) {x/sum(x)} ) %>% #Convert the absolute count to a percentage count
+  psmelt() %>% #Adjust the data from a phyloseq object into a data.frame-class table  
+  filter(Abundance > 0.01)   %>% #Remove samples that make up less than one percent of the abundance.
+  arrange(Phylum)#Arange the samples by Domain.
+
+
+
+#Make Summary plot
+Sum_Comm_0_0m_df <- summarySE(Comm_0_0m_df, measurevar="Abundance", groupvars=c("Phylum", "Sample_Depth", "Distance_from_L1", "Depth_m", "Domain"))
+Sum_Comm_0_0m_df 
+
+#Create plot
+Comm_0_0m_plot = ggplot(Sum_Comm_0_0m_df,
+                          aes(x= "",
+                              y=Abundance,
+                              fill=Phylum, 
+                              group = Domain)) +
+  geom_bar(stat = "identity", 
+           position = "fill") +
+  scale_y_continuous(labels = percent_format()) +
+  scale_fill_manual(values = Phylum_colour_list)+
+  ylab("Relative abundance (%)")
+
+Comm_0_0m_plot
+
+Comm_0_0m_plot_pie = Comm_0_0m_plot + coord_polar("y", start = 0)
+
+Comm_0_0m_plot_pie 
+
+```
+###14.3km
+```{r Community for 14.3 km surface}
+#Make combined object
+#Fiord_phyloseq_Horonly = merge_phyloseq(Fiord_phyloseq_16S_Horonly, Fiord_phyloseq_18S_Horonly)
+
+#Subset samples
+Comm_14.3_0m = subset_samples(Fiord_phyloseq_Horonly, Distance_from_L1 == "14.3" & Sample_Depth == "0" | Distance_from_L1 == "14.3" & Depth_m == "0")
+
+Comm_14.3_0m_df = Comm_14.3_0m %>% #Identify the original subsetted phyloseq object
+  tax_glom("Phylum") %>% #Merge species with the same Domain.
+  transform_sample_counts(function(x) {x/sum(x)} ) %>% #Convert the absolute count to a percentage count
+  psmelt() %>% #Adjust the data from a phyloseq object into a data.frame-class table  
+  filter(Abundance > 0.01)   %>% #Remove samples that make up less than one percent of the abundance.
+  arrange(Phylum)#Arange the samples by Domain.
+
+#Make Summary plot
+Sum_Comm_14.3_0m_df <- summarySE(Comm_14.3_0m_df, measurevar="Abundance", groupvars=c("Phylum", "Sample_Depth", "Distance_from_L1", "Depth_m", "Domain"))
+Sum_Comm_14.3_0m_df 
+
+#Create plot
+Comm_14.3_0m_plot = ggplot(Sum_Comm_14.3_0m_df,
+                          aes(x= "",
+                              y=Abundance,
+                              fill=Phylum,
+                              group = Domain)) +
+  geom_bar(stat = "identity", 
+           position = "fill") +
+  scale_y_continuous(labels = percent_format()) +
+  scale_fill_manual(values = Phylum_colour_list)+
+  ylab("Relative abundance (%)")
+
+Comm_14.3_0m_plot
+
+Comm_14.3_0m_plot_pie = Comm_14.3_0m_plot + coord_polar("y", start = 0)
+
+Comm_14.3_0m_plot_pie 
+
+
+```
+##10 m
+###0km
+```{r Community for 0 km surface}
+#Make combined object
+#Fiord_phyloseq_Horonly = merge_phyloseq(Fiord_phyloseq_16S_Horonly, Fiord_phyloseq_18S_Horonly)
+
+#Subset samples
+Comm_0_10m = subset_samples(Fiord_phyloseq_Horonly, Distance_from_L1 == "0" & Sample_Depth == "10" | Distance_from_L1 == "0" & Depth_m == "10")
+
+Comm_0_10m_df = Comm_0_10m %>% #Identify the original subsetted phyloseq object
+  tax_glom("Phylum") %>% #Merge species with the same Domain.
+  transform_sample_counts(function(x) {x/sum(x)} ) %>% #Convert the absolute count to a percentage count
+  psmelt() %>% #Adjust the data from a phyloseq object into a data.frame-class table  
+  filter(Abundance > 0.01)   %>% #Remove samples that make up less than one percent of the abundance.
+  arrange(Phylum)#Arange the samples by Domain.
+
+#Make Summary plot
+Sum_Comm_0_10m_df <- summarySE(Comm_0_10m_df, measurevar="Abundance", groupvars=c("Phylum", "Sample_Depth", "Distance_from_L1", "Depth_m", "Domain"))
+Sum_Comm_0_10m_df 
+
+#Create plot
+Comm_0_10m_plot = ggplot(Sum_Comm_0_10m_df,
+                          aes(x= "",
+                              y=Abundance,
+                              fill=Phylum,
+                              group = Domain)) +
+  geom_bar(stat = "identity", 
+           position = "fill") +
+  scale_y_continuous(labels = percent_format()) +
+  scale_fill_manual(values = Phylum_colour_list)+
+  #ggtitle("Fjord Sound sample") + 
+  #facet_grid("Sample_Depth")+
+  #theme(plot.title = element_text(hjust = 0.5))+
+  #xlab("Sample Depth (m)")+
+  ylab("Relative abundance (%)")
+
+Comm_0_10m_plot
+
+Comm_0_10m_plot_pie = Comm_0_10m_plot + coord_polar("y", start = 0)
+
+Comm_0_10m_plot_pie 
+
+```
+###14.3km
+```{r Community for 14.3 km surface}
+#Make combined object
+#Fiord_phyloseq_Horonly = merge_phyloseq(Fiord_phyloseq_16S_Horonly, Fiord_phyloseq_18S_Horonly)
+
+#Subset samples
+Comm_14.3_10m = subset_samples(Fiord_phyloseq_Horonly, Distance_from_L1 == "14.3" & Sample_Depth == "10" | Distance_from_L1 == "14.3" & Depth_m == "10")
+
+Comm_14.3_10m_df = Comm_14.3_10m %>% #Identify the original subsetted phyloseq object
+  tax_glom("Phylum") %>% #Merge species with the same Domain.
+  transform_sample_counts(function(x) {x/sum(x)} ) %>% #Convert the absolute count to a percentage count
+  psmelt() %>% #Adjust the data from a phyloseq object into a data.frame-class table  
+  filter(Abundance > 0.01)   %>% #Remove samples that make up less than one percent of the abundance.
+  arrange(Phylum)#Arange the samples by Domain.
+
+#Make Summary plot
+Sum_Comm_14.3_10m_df <- summarySE(Comm_14.3_10m_df, measurevar="Abundance", groupvars=c("Phylum", "Sample_Depth", "Distance_from_L1", "Depth_m", "Domain"))
+Sum_Comm_14.3_10m_df 
+
+#Create plot
+Comm_14.3_10m_plot = ggplot(Sum_Comm_14.3_10m_df,
+                          aes(x= "",
+                              y=Abundance,
+                              fill=Phylum, 
+                              group = Domain)) +
+  geom_bar(stat = "identity", 
+           position = "fill") +
+  scale_y_continuous(labels = percent_format()) +
+  scale_fill_manual(values = Phylum_colour_list)+
+  #ggtitle("Fjord Sound sample") + 
+  #facet_grid("Sample_Depth")+
+  #theme(plot.title = element_text(hjust = 0.5))+
+  #xlab("Sample Depth (m)")+
+  ylab("Relative abundance (%)")
+
+Comm_14.3_10m_plot
+
+Comm_14.3_10m_plot_pie = Comm_14.3_10m_plot + coord_polar("y", start = 0)#+ 
+  #geom_text(aes(y = Abundance + c(0, cumsum(Abundance)[-length(Abundance)]), label = percent(Abundance)), size=4)
+
+Comm_14.3_10m_plot_pie 
+
+```
+#Vertical
+##Surface (0 m)
+```{r Community for surface}
+#Make combined object
+Fiord_phyloseq_Vert = merge_phyloseq(Fiord_phyloseq_16S_Vert, Fiord_phyloseq_18S_Vert)
+
+#Subset samples
+Comm_Vert_0m = subset_samples(Fiord_phyloseq_Vert, Sample_Depth == "0" | Depth_m == "0")
+
+Comm_Vert_0m_df = Comm_Vert_0m %>% #Identify the original subsetted phyloseq object
+  tax_glom("Phylum") %>% #Merge species with the same Domain.
+  transform_sample_counts(function(x) {x/sum(x)} ) %>% #Convert the absolute count to a percentage count
+  psmelt() %>% #Adjust the data from a phyloseq object into a data.frame-class table  
+  filter(Abundance > 0.01)   %>% #Remove samples that make up less than one percent of the abundance.
+  arrange(Phylum)#Arange the samples by Domain.
+
+#Make Summary plot
+Sum_Comm_Vert_0m_df <- summarySE(Comm_Vert_0m_df, measurevar="Abundance", groupvars=c("Phylum", "Sample_Depth", "Depth_m", "Domain"))
+Sum_Comm_Vert_0m_df 
+
+#Create plot
+Comm_Vert_0m_plot = ggplot(Sum_Comm_Vert_0m_df,
+                          aes(x= "",
+                              y=Abundance,
+                              fill=Phylum, 
+                              group = Domain)) +
+  geom_bar(stat = "identity", 
+           position = "fill") +
+  scale_y_continuous(labels = percent_format()) +
+  scale_fill_manual(values = Phylum_colour_list)+
+  #ggtitle("Fjord Sound sample") + 
+  #facet_grid("Sample_Depth")+
+  #theme(plot.title = element_text(hjust = 0.5))+
+  #xlab("Sample Depth (m)")+
+  ylab("Relative abundance (%)")
+
+Comm_Vert_0m_plot
+
+Comm_Vert_0m_plot_pie = Comm_Vert_0m_plot + coord_polar("y", start = 0)
+Comm_Vert_0m_plot_pie 
+
+```
+##10m
+```{r Community for 10m}
+#Make combined object
+#Fiord_phyloseq_Vert = merge_phyloseq(Fiord_phyloseq_16S_Vert, Fiord_phyloseq_18S_Vert)
+
+#Subset samples
+Comm_Vert_10m = subset_samples(Fiord_phyloseq_Vert, Sample_Depth == "10" | Depth_m == "10")
+
+Comm_Vert_10m_df = Comm_Vert_10m %>% #Identify the original subsetted phyloseq object
+  tax_glom("Phylum") %>% #Merge species with the same Domain.
+  transform_sample_counts(function(x) {x/sum(x)} ) %>% #Convert the absolute count to a percentage count
+  psmelt() %>% #Adjust the data from a phyloseq object into a data.frame-class table  
+  filter(Abundance > 0.01)   %>% #Remove samples that make up less than one percent of the abundance.
+  arrange(Phylum)#Arange the samples by Domain.
+
+#Make Summary plot
+Sum_Comm_Vert_10m_df <- summarySE(Comm_Vert_10m_df, measurevar="Abundance", groupvars=c("Phylum", "Sample_Depth", "Depth_m", "Domain"))
+Sum_Comm_Vert_10m_df 
+
+#Create plot
+Comm_Vert_10m_plot = ggplot(Sum_Comm_Vert_10m_df,
+                          aes(x= "",
+                              y=Abundance,
+                              fill=Phylum,
+                              group = Domain)) +
+  geom_bar(stat = "identity", 
+           position = "fill") +
+  scale_y_continuous(labels = percent_format()) +
+  scale_fill_manual(values = Phylum_colour_list)+
+  #ggtitle("Fjord Sound sample") + 
+  #facet_grid("Sample_Depth")+
+  #theme(plot.title = element_text(hjust = 0.5))+
+  #xlab("Sample Depth (m)")+
+  ylab("Relative abundance (%)")
+
+Comm_Vert_10m_plot
+
+Comm_Vert_10m_plot_pie = Comm_Vert_10m_plot + coord_polar("y", start = 0)
+Comm_Vert_10m_plot_pie 
+
+```
+
+##40m
+```{r Community for 40m}
+####Prokaryotes####
+
+#Subset samples
+Comm_Vert_40m_Prok = subset_samples(Fiord_phyloseq_16S_Vert, Sample_Depth == "40")
+
+Comm_Vert_40m_Prok_df = Comm_Vert_40m_Prok %>% #Identify the original subsetted phyloseq object
+  tax_glom("Phylum") %>% #Merge species with the same Domain.
+  transform_sample_counts(function(x) {x/sum(x)} ) %>% #Convert the absolute count to a percentage count
+  psmelt() %>% #Adjust the data from a phyloseq object into a data.frame-class table  
+  filter(Abundance > 0.01)   %>% #Remove samples that make up less than one percent of the abundance.
+  arrange(Phylum)#Arange the samples by Domain.
+
+#Make Summary plot
+Sum_Comm_Vert_40m_Prok_df <- summarySE(Comm_Vert_40m_Prok_df, measurevar="Abundance", groupvars=c("Phylum", "Sample_Depth"))
+Sum_Comm_Vert_40m_Prok_df 
+
+#Create plot
+Comm_Vert_40m_Prok_plot = ggplot(Sum_Comm_Vert_40m_Prok_df,
+                          aes(x= "",
+                              y=Abundance,
+                              fill=Phylum)) +
+  geom_bar(stat = "identity", 
+           position = "fill") +
+  scale_y_continuous(labels = percent_format()) +
+  scale_fill_manual(values = Phylum_colour_list)+
+  #ggtitle("Fjord Sound sample") + 
+  #facet_grid("Sample_Depth")+
+  #theme(plot.title = element_text(hjust = 0.5))+
+  #xlab("Sample Depth (m)")+
+  ylab("Relative abundance (%)")
+
+Comm_Vert_40m_Prok_plot
+
+Comm_Vert_40m_Prok_plot_pie = Comm_Vert_40m_Prok_plot + coord_polar("y", start = 0)
+
+Comm_Vert_40m_Prok_plot_pie 
+
+####Eukaryotes####
+#Subset samples
+Comm_Vert_40m_Euk = subset_samples(Fiord_phyloseq_18S_Vert, Depth_m == "40")
+
+Comm_Vert_40m_Euk_df = Comm_Vert_40m_Euk %>% #Identify the original subsetted phyloseq object
+  tax_glom("Phylum") %>% #Merge species with the same Domain.
+  transform_sample_counts(function(x) {x/sum(x)} ) %>% #Convert the absolute count to a percentage count
+  psmelt() %>% #Adjust the data from a phyloseq object into a data.frame-class table  
+  filter(Abundance > 0.01)   %>% #Remove samples that make up less than one percent of the abundance.
+  arrange(Phylum)#Arange the samples by Domain.
+
+#Make Summary plot
+Sum_Comm_Vert_40m_Euk_df <- summarySE(Comm_Vert_40m_Euk_df, measurevar="Abundance", groupvars=c("Phylum", "Depth_m"))
+Sum_Comm_Vert_40m_Euk_df 
+
+#Create plot
+Comm_Vert_40m_Euk_plot = ggplot(Sum_Comm_Vert_40m_Euk_df,
+                          aes(x= "",
+                              y=Abundance,
+                              fill=Phylum)) +
+  geom_bar(stat = "identity", 
+           position = "fill") +
+  scale_y_continuous(labels = percent_format()) +
+  scale_fill_manual(values = Phylum_colour_list)+
+  #ggtitle("Fjord Sound sample") + 
+  #facet_grid("Sample_Depth")+
+  #theme(plot.title = element_text(hjust = 0.5))+
+  #xlab("Sample Depth (m)")+
+  ylab("Relative abundance (%)")
+
+Comm_Vert_40m_Euk_plot
+
+Comm_Vert_40m_Euk_plot_pie = Comm_Vert_40m_Euk_plot + coord_polar("y", start = 0)
+
+Comm_Vert_40m_Euk_plot_pie 
+####Combined####
+#Make combined object
+#Fiord_phyloseq_Vert = merge_phyloseq(Fiord_phyloseq_16S_Vert, Fiord_phyloseq_18S_Vert)
+
+#Subset samples
+Comm_Vert_40m = subset_samples(Fiord_phyloseq_Vert, Sample_Depth == "40" | Depth_m == "40")
+
+Comm_Vert_40m_df = Comm_Vert_40m %>% #Identify the original subsetted phyloseq object
+  tax_glom("Phylum") %>% #Merge species with the same Domain.
+  transform_sample_counts(function(x) {x/sum(x)} ) %>% #Convert the absolute count to a percentage count
+  psmelt() %>% #Adjust the data from a phyloseq object into a data.frame-class table  
+  filter(Abundance > 0.01)   %>% #Remove samples that make up less than one percent of the abundance.
+  arrange(Phylum)#Arange the samples by Domain.
+
+#Make Summary plot
+Sum_Comm_Vert_40m_df <- summarySE(Comm_Vert_40m_df, measurevar="Abundance", groupvars=c("Phylum", "Sample_Depth", "Depth_m", "Domain"))
+Sum_Comm_Vert_40m_df 
+
+#Create plot
+Comm_Vert_40m_plot = ggplot(Sum_Comm_Vert_40m_df,
+                          aes(x= "",
+                              y=Abundance,
+                              fill=Phylum,
+                              group = Domain)) +
+  geom_bar(stat = "identity", 
+           position = "fill") +
+  scale_y_continuous(labels = percent_format()) +
+  scale_fill_manual(values = Phylum_colour_list)+
+  #ggtitle("Fjord Sound sample") + 
+  #facet_grid("Sample_Depth")+
+  #theme(plot.title = element_text(hjust = 0.5))+
+  #xlab("Sample Depth (m)")+
+  ylab("Relative abundance (%)")
+
+Comm_Vert_40m_plot
+
+Comm_Vert_40m_plot_pie = Comm_Vert_40m_plot + coord_polar("y", start = 0)
+Comm_Vert_40m_plot_pie 
+
+```
+
+##100m
+```{r Community for 100m}
+#Make combined object
+#Fiord_phyloseq_Vert = merge_phyloseq(Fiord_phyloseq_16S_Vert, Fiord_phyloseq_18S_Vert)
+
+#Subset samples
+Comm_Vert_100m = subset_samples(Fiord_phyloseq_Vert, Sample_Depth == "100" | Depth_m == "100")
+
+Comm_Vert_100m_df = Comm_Vert_100m %>% #Identify the original subsetted phyloseq object
+  tax_glom("Phylum") %>% #Merge species with the same Domain.
+  transform_sample_counts(function(x) {x/sum(x)} ) %>% #Convert the absolute count to a percentage count
+  psmelt() %>% #Adjust the data from a phyloseq object into a data.frame-class table  
+  filter(Abundance > 0.01)   %>% #Remove samples that make up less than one percent of the abundance.
+  arrange(Phylum)#Arange the samples by Domain.
+
+#Make Summary plot
+Sum_Comm_Vert_100m_df <- summarySE(Comm_Vert_100m_df, measurevar="Abundance", groupvars=c("Phylum", "Sample_Depth", "Depth_m", "Domain"))
+Sum_Comm_Vert_100m_df 
+
+#Create plot
+Comm_Vert_100m_plot = ggplot(Sum_Comm_Vert_100m_df,
+                          aes(x= "",
+                              y=Abundance,
+                              fill=Phylum,
+                              group = Domain)) +
+  geom_bar(stat = "identity", 
+           position = "fill") +
+  scale_y_continuous(labels = percent_format()) +
+  scale_fill_manual(values = Phylum_colour_list)+
+  #ggtitle("Fjord Sound sample") + 
+  #facet_grid("Sample_Depth")+
+  #theme(plot.title = element_text(hjust = 0.5))+
+  #xlab("Sample Depth (m)")+
+  ylab("Relative abundance (%)")
+
+Comm_Vert_100m_plot
+
+Comm_Vert_100m_plot_pie = Comm_Vert_100m_plot + coord_polar("y", start = 0)
+Comm_Vert_100m_plot_pie 
+
+```
+
+##200m
+```{r Community for 200m}
+#Make combined object
+#Fiord_phyloseq_Vert = merge_phyloseq(Fiord_phyloseq_16S_Vert, Fiord_phyloseq_18S_Vert)
+
+#Subset samples
+Comm_Vert_200m = subset_samples(Fiord_phyloseq_Vert, Sample_Depth == "200" | Depth_m == "200")
+
+Comm_Vert_200m_df = Comm_Vert_200m %>% #Identify the original subsetted phyloseq object
+  tax_glom("Phylum") %>% #Merge species with the same Domain.
+  transform_sample_counts(function(x) {x/sum(x)} ) %>% #Convert the absolute count to a percentage count
+  psmelt() %>% #Adjust the data from a phyloseq object into a data.frame-class table  
+  filter(Abundance > 0.01)   %>% #Remove samples that make up less than one percent of the abundance.
+  arrange(Phylum)#Arange the samples by Domain.
+
+#Make Summary plot
+Sum_Comm_Vert_200m_df <- summarySE(Comm_Vert_200m_df, measurevar="Abundance", groupvars=c("Phylum", "Sample_Depth", "Depth_m", "Domain"))
+Sum_Comm_Vert_200m_df 
+
+#Create plot
+Comm_Vert_200m_plot = ggplot(Sum_Comm_Vert_200m_df,
+                          aes(x= "",
+                              y=Abundance,
+                              fill=Phylum,
+                              group = Domain)) +
+  geom_bar(stat = "identity", 
+           position = "fill") +
+  scale_y_continuous(labels = percent_format()) +
+  scale_fill_manual(values = Phylum_colour_list)+
+  #ggtitle("Fjord Sound sample") + 
+  #facet_grid("Sample_Depth")+
+  #theme(plot.title = element_text(hjust = 0.5))+
+  #xlab("Sample Depth (m)")+
+  ylab("Relative abundance (%)")
+
+Comm_Vert_200m_plot
+
+Comm_Vert_200m_plot_pie = Comm_Vert_200m_plot + coord_polar("y", start = 0)
+Comm_Vert_200m_plot_pie 
+
+```
+
+##360m
+```{r Community for 360m}
+#Make combined object
+#Fiord_phyloseq_Vert = merge_phyloseq(Fiord_phyloseq_16S_Vert, Fiord_phyloseq_18S_Vert)
+
+#Subset samples
+Comm_Vert_360m = subset_samples(Fiord_phyloseq_Vert, Sample_Depth == "360" | Depth_m == "360")
+
+Comm_Vert_360m_df = Comm_Vert_360m %>% #Identify the original subsetted phyloseq object
+  tax_glom("Phylum") %>% #Merge species with the same Domain.
+  transform_sample_counts(function(x) {x/sum(x)} ) %>% #Convert the absolute count to a percentage count
+  psmelt() %>% #Adjust the data from a phyloseq object into a data.frame-class table  
+  filter(Abundance > 0.01)   %>% #Remove samples that make up less than one percent of the abundance.
+  arrange(Phylum)#Arange the samples by Domain.
+
+#Make Summary plot
+Sum_Comm_Vert_360m_df <- summarySE(Comm_Vert_360m_df, measurevar="Abundance", groupvars=c("Phylum", "Sample_Depth", "Depth_m", "Domain"))
+Sum_Comm_Vert_360m_df 
+
+#Create plot
+Comm_Vert_360m_plot = ggplot(Sum_Comm_Vert_360m_df,
+                          aes(x= "",
+                              y=Abundance,
+                              fill=Phylum, 
+                              group = Domain)) +
+  geom_bar(stat = "identity", 
+           position = "fill") +
+  scale_y_continuous(labels = percent_format()) +
+  scale_fill_manual(values = Phylum_colour_list)+
+  #ggtitle("Fjord Sound sample") + 
+  #facet_grid("Sample_Depth")+
+  #theme(plot.title = element_text(hjust = 0.5))+
+  #xlab("Sample Depth (m)")+
+  ylab("Relative abundance (%)")
+
+Comm_Vert_360m_plot
+
+Comm_Vert_360m_plot_pie = Comm_Vert_360m_plot + coord_polar("y", start = 0)
+Comm_Vert_360m_plot_pie 
+```
+#Save pdf's
+```{r}
+pdf("/My/Path/Combined_col.pdf")
+Comm_0_0m_plot_pie + ggtitle("Comm_0_0m")
+Comm_0_10m_plot_pie + ggtitle("Comm_0_10m")
+Comm_14.3_0m_plot_pie + ggtitle("Comm_14.3_0m")
+Comm_14.3_10m_plot_pie + ggtitle("Comm_14.3_10m")
+Comm_Vert_0m_plot_pie + ggtitle("Comm_Vert_0m")
+Comm_Vert_10m_plot_pie + ggtitle("Comm_Vert_10m")
+Comm_Vert_40m_plot_pie + ggtitle("Comm_Vert_40m")
+Comm_Vert_100m_plot_pie + ggtitle("Comm_Vert_100m")
+Comm_Vert_200m_plot_pie + ggtitle("Comm_Vert_200m")
+Comm_Vert_360m_plot_pie + ggtitle("Comm_Vert_360m")
+dev.off()
+```
+Subsequent editing was done within Inkscape.
