@@ -786,4 +786,4 @@ Comm_Vert_200m_plot_pie + ggtitle("Comm_Vert_200m")
 Comm_Vert_360m_plot_pie + ggtitle("Comm_Vert_360m")
 dev.off()
 ```
-Subsequent editing was done within Inkscape.
+Subsequent editing for readibility and placement within the fjord was done using Inkscape.
